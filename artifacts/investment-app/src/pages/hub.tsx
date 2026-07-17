@@ -146,7 +146,7 @@ export default function HubPage() {
               type="text"
               value={ticker}
               onChange={(e) => setTicker(e.target.value)}
-              placeholder="ENTER TICKER SYMBOL..."
+              placeholder="TICKER OR INDEX NAME (AAPL, KOSPI, DAX, GOLD...)"
               className="w-full bg-card border-2 border-border rounded-lg py-4 pl-12 pr-4 text-lg font-mono placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase transition-all"
             />
             <button

@@ -382,8 +382,97 @@ export interface AnalysisResult {
   investorRec: RecommendationDetail;
 }
 
+// ── Ticker alias map ─────────────────────────────────────────────────────────
+// Maps common names / abbreviations → Yahoo Finance symbols
+const TICKER_ALIASES: Record<string, string> = {
+  // Global index names users commonly type
+  "KOSPI":       "^KS11",
+  "KOSPI200":    "^KS200",
+  "EGX30":       "^CASE30",
+  "EGX":         "^CASE30",
+  "NIKKEI":      "^N225",
+  "NIKKEI225":   "^N225",
+  "N225":        "^N225",
+  "DAX":         "^GDAXI",
+  "DAX40":       "^GDAXI",
+  "FTSE":        "^FTSE",
+  "FTSE100":     "^FTSE",
+  "CAC":         "^FCHI",
+  "CAC40":       "^FCHI",
+  "EUROSTOXX":   "^STOXX50E",
+  "EUROSTOXX50": "^STOXX50E",
+  "STOXX50":     "^STOXX50E",
+  "IBEX":        "^IBEX",
+  "IBEX35":      "^IBEX",
+  "SMI":         "^SSMI",
+  "ATX":         "^ATX",
+  "BEL20":       "^BFX",
+  "AEX":         "^AEX",
+  "OMXS30":      "^OMXS30",
+  "OMXC25":      "^OMXC25",
+  "OSLO":        "^OSEAX",
+  "HANGSENG":    "^HSI",
+  "HSI":         "^HSI",
+  "NIFTY":       "^NSEI",
+  "NIFTY50":     "^NSEI",
+  "SENSEX":      "^BSESN",
+  "BSE":         "^BSESN",
+  "ASX":         "^AXJO",
+  "ASX200":      "^AXJO",
+  "NZX":         "^NZ50",
+  "NZX50":       "^NZ50",
+  "STI":         "^STI",
+  "JAKARTA":     "^JKSE",
+  "IDX":         "^JKSE",
+  "KLCI":        "^KLSE",
+  "BURSA":       "^KLSE",
+  "TAIWAN":      "^TWII",
+  "TAIEX":       "^TWII",
+  "SHANGHAI":    "000001.SS",
+  "SSE":         "000001.SS",
+  "SHENZHEN":    "399001.SZ",
+  "SZSE":        "399001.SZ",
+  "TSX":         "^GSPTSE",
+  "BOVESPA":     "^BVSP",
+  "IBOVESPA":    "^BVSP",
+  "MERVAL":      "^MERV",
+  "IPC":         "^MXX",
+  "BMV":         "^MXX",
+  "IPSA":        "^IPSA",
+  "TA125":       "^TA125.TA",
+  "BIST":        "^XU100",
+  "BIST100":     "^XU100",
+  "XU100":       "^XU100",
+  // US index shortcuts
+  "SPX":         "^GSPC",
+  "SP500":       "^GSPC",
+  "S&P500":      "^GSPC",
+  "S&P":         "^GSPC",
+  "DOW":         "^DJI",
+  "DJIA":        "^DJI",
+  "DOW30":       "^DJI",
+  "NASDAQ":      "^IXIC",
+  "NASDAQ100":   "^NDX",
+  "NDX":         "^NDX",
+  "RUSSELL":     "^RUT",
+  "RUSSELL2000": "^RUT",
+  "VIX":         "^VIX",
+  // Commodities / crypto shortcuts
+  "GOLD":        "GC=F",
+  "OIL":         "CL=F",
+  "CRUDE":       "CL=F",
+  "WTI":         "CL=F",
+  "BRENT":       "BZ=F",
+  "SILVER":      "SI=F",
+  "BITCOIN":     "BTC-USD",
+  "ETHEREUM":    "ETH-USD",
+  "ETH":         "ETH-USD",
+  "BTC":         "BTC-USD",
+};
+
 export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
-  const ticker = tickerRaw.toUpperCase().trim();
+  const upper = tickerRaw.toUpperCase().trim().replace(/\s+/g, "");
+  const ticker = TICKER_ALIASES[upper] ?? upper;
 
   // Fetch ticker and SPY history in parallel
   const [history, spyHistory, summary, searchResult] = await Promise.allSettled([
