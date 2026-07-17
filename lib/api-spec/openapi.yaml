@@ -169,6 +169,26 @@ components:
         - sma50
         - sma200
 
+    RecommendationDetail:
+      type: object
+      description: A recommendation for either a trader (short-term technical) or investor (long-term fundamental)
+      properties:
+        recommendation:
+          type: string
+          description: "One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL"
+        score:
+          type: number
+          description: Composite score driving recommendation
+        rationale:
+          type: array
+          items:
+            type: string
+          description: Specific sentences explaining why this recommendation was reached
+      required:
+        - recommendation
+        - score
+        - rationale
+
     AnalysisResult:
       type: object
       properties:
@@ -224,10 +244,16 @@ components:
             type: string
         recommendation:
           type: string
-          description: "One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL"
+          description: "Combined recommendation. One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL"
         score:
           type: number
-          description: Composite score driving recommendation
+          description: Combined composite score
+        traderRec:
+          $ref: "#/components/schemas/RecommendationDetail"
+          description: Short-term recommendation based on technical signals (RSI, MACD, momentum, support/resistance)
+        investorRec:
+          $ref: "#/components/schemas/RecommendationDetail"
+          description: Long-term recommendation based on fundamental and trend signals (P/E, SMA200, 52-week range, dividend)
       required:
         - ticker
         - currentPrice
@@ -242,6 +268,8 @@ components:
         - news
         - recommendation
         - score
+        - traderRec
+        - investorRec
 
     MacroDataEntry:
       type: object

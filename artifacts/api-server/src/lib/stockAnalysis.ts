@@ -82,32 +82,252 @@ function explainSMA(price: number, sma: number, period: number): string {
   return `Price below ${period}-day SMA ($${sma.toFixed(2)}) — bearish trend`;
 }
 
-function calcRecommendation(
+function scoreToLabel(score: number): string {
+  if (score >= 3) return "STRONG BUY";
+  if (score >= 1.5) return "BUY";
+  if (score >= -0.5) return "HOLD";
+  if (score >= -2) return "SELL";
+  return "STRONG SELL";
+}
+
+export interface RecommendationDetail {
+  recommendation: string;
+  score: number;
+  rationale: string[];
+}
+
+function calcTraderRecommendation(
   rsi: number,
   macd: number,
   macdSignal: number,
+  macdHistogram: number,
   price: number,
   sma50: number,
-  sma200: number
-): { recommendation: string; score: number } {
+  support: number,
+  resistance: number,
+  volume: number | null,
+  avgVolume: number | null,
+  closes: number[]
+): RecommendationDetail {
   let score = 0;
-  if (rsi < 30) score += 1;
-  if (rsi > 70) score -= 1;
-  if (macd > macdSignal) score += 1;
-  else score -= 1;
-  if (price > sma50) score += 0.5;
-  else score -= 0.5;
-  if (price > sma200) score += 0.5;
-  else score -= 0.5;
+  const rationale: string[] = [];
 
-  let recommendation: string;
-  if (score >= 2.5) recommendation = "STRONG BUY";
-  else if (score >= 1) recommendation = "BUY";
-  else if (score >= -0.5) recommendation = "HOLD";
-  else if (score >= -2) recommendation = "SELL";
-  else recommendation = "STRONG SELL";
+  // RSI signal
+  if (rsi < 25) {
+    score += 2;
+    rationale.push(`RSI at ${rsi.toFixed(1)} — deeply oversold, high-probability bounce setup`);
+  } else if (rsi < 35) {
+    score += 1.5;
+    rationale.push(`RSI at ${rsi.toFixed(1)} — oversold territory, short-term reversal likely`);
+  } else if (rsi < 45) {
+    score += 0.5;
+    rationale.push(`RSI at ${rsi.toFixed(1)} — below midpoint, mild bullish bias`);
+  } else if (rsi > 75) {
+    score -= 2;
+    rationale.push(`RSI at ${rsi.toFixed(1)} — severely overbought, pullback risk is high`);
+  } else if (rsi > 65) {
+    score -= 1;
+    rationale.push(`RSI at ${rsi.toFixed(1)} — approaching overbought, momentum may stall`);
+  } else {
+    rationale.push(`RSI at ${rsi.toFixed(1)} — neutral momentum zone`);
+  }
 
-  return { recommendation, score };
+  // MACD signal
+  if (macd > macdSignal) {
+    score += 1.5;
+    rationale.push(
+      `MACD (${macd.toFixed(2)}) above signal (${macdSignal.toFixed(2)}) — bullish crossover, upward momentum building`
+    );
+  } else {
+    score -= 1.5;
+    rationale.push(
+      `MACD (${macd.toFixed(2)}) below signal (${macdSignal.toFixed(2)}) — bearish crossover, downward pressure`
+    );
+  }
+
+  // Histogram direction (momentum acceleration)
+  if (macdHistogram > 0) {
+    score += 0.5;
+    rationale.push(`MACD histogram positive (${macdHistogram.toFixed(2)}) — momentum is accelerating`);
+  } else {
+    score -= 0.5;
+    rationale.push(`MACD histogram negative (${macdHistogram.toFixed(2)}) — momentum is weakening`);
+  }
+
+  // Price vs SMA50
+  const pctAboveSMA50 = ((price - sma50) / sma50) * 100;
+  if (price > sma50) {
+    score += 1;
+    rationale.push(
+      `Price (${price.toFixed(2)}) is ${pctAboveSMA50.toFixed(1)}% above 50-day SMA (${sma50.toFixed(2)}) — short-term uptrend intact`
+    );
+  } else {
+    score -= 1;
+    rationale.push(
+      `Price (${price.toFixed(2)}) is ${Math.abs(pctAboveSMA50).toFixed(1)}% below 50-day SMA (${sma50.toFixed(2)}) — short-term downtrend`
+    );
+  }
+
+  // Support / resistance proximity
+  const distToSupport = ((price - support) / price) * 100;
+  const distToResistance = ((resistance - price) / price) * 100;
+  if (distToSupport < 3) {
+    score += 1;
+    rationale.push(
+      `Price is ${distToSupport.toFixed(1)}% above support (${support.toFixed(2)}) — strong entry near floor`
+    );
+  } else if (distToResistance < 3) {
+    score -= 1;
+    rationale.push(
+      `Price is ${distToResistance.toFixed(1)}% below resistance (${resistance.toFixed(2)}) — approaching a potential ceiling`
+    );
+  }
+
+  // Volume confirmation
+  if (volume != null && avgVolume != null && avgVolume > 0) {
+    const volRatio = volume / avgVolume;
+    if (volRatio > 1.5) {
+      score += 0.5;
+      rationale.push(
+        `Volume is ${volRatio.toFixed(1)}x the 30-day average — strong conviction behind current move`
+      );
+    } else if (volRatio < 0.5) {
+      score -= 0.5;
+      rationale.push(`Volume is only ${(volRatio * 100).toFixed(0)}% of average — weak participation, less reliable signal`);
+    }
+  }
+
+  // Short-term 5-day momentum
+  if (closes.length >= 6) {
+    const momentum = ((closes[closes.length - 1] - closes[closes.length - 6]) / closes[closes.length - 6]) * 100;
+    if (momentum > 3) {
+      score += 0.5;
+      rationale.push(`5-day price momentum: +${momentum.toFixed(1)}% — strong short-term upswing`);
+    } else if (momentum < -3) {
+      score -= 0.5;
+      rationale.push(`5-day price momentum: ${momentum.toFixed(1)}% — sharp short-term decline`);
+    }
+  }
+
+  return { recommendation: scoreToLabel(score), score, rationale };
+}
+
+function calcInvestorRecommendation(
+  rsi: number,
+  price: number,
+  sma50: number,
+  sma200: number,
+  peRatio: number | null,
+  eps: number | null,
+  dividendYield: number | null,
+  fiftyTwoWeekHigh: number | null,
+  fiftyTwoWeekLow: number | null,
+): RecommendationDetail {
+  let score = 0;
+  const rationale: string[] = [];
+
+  // Long-term trend: SMA200
+  const pctAboveSMA200 = ((price - sma200) / sma200) * 100;
+  if (price > sma200) {
+    score += 1.5;
+    rationale.push(
+      `Price (${price.toFixed(2)}) is ${pctAboveSMA200.toFixed(1)}% above 200-day SMA (${sma200.toFixed(2)}) — long-term uptrend confirmed`
+    );
+  } else {
+    score -= 1.5;
+    rationale.push(
+      `Price (${price.toFixed(2)}) is ${Math.abs(pctAboveSMA200).toFixed(1)}% below 200-day SMA (${sma200.toFixed(2)}) — long-term downtrend, caution warranted`
+    );
+  }
+
+  // Golden / Death cross
+  if (sma50 > sma200) {
+    score += 1;
+    rationale.push(
+      `Golden Cross active — 50-day SMA (${sma50.toFixed(2)}) above 200-day SMA (${sma200.toFixed(2)}), a classic long-term bullish signal`
+    );
+  } else {
+    score -= 1;
+    rationale.push(
+      `Death Cross active — 50-day SMA (${sma50.toFixed(2)}) below 200-day SMA (${sma200.toFixed(2)}), a classic long-term bearish signal`
+    );
+  }
+
+  // Valuation via P/E
+  if (peRatio != null) {
+    if (peRatio < 12) {
+      score += 2;
+      rationale.push(`P/E ratio of ${peRatio.toFixed(1)} is very low — stock appears deeply undervalued relative to earnings`);
+    } else if (peRatio < 20) {
+      score += 1;
+      rationale.push(`P/E ratio of ${peRatio.toFixed(1)} is reasonable — fair value with upside potential`);
+    } else if (peRatio < 30) {
+      rationale.push(`P/E ratio of ${peRatio.toFixed(1)} is moderate — priced for growth, not a value play`);
+    } else if (peRatio < 50) {
+      score -= 1;
+      rationale.push(`P/E ratio of ${peRatio.toFixed(1)} is elevated — stock carries a growth premium, higher risk if earnings disappoint`);
+    } else {
+      score -= 2;
+      rationale.push(`P/E ratio of ${peRatio.toFixed(1)} is very high — significant earnings growth must materialise to justify price`);
+    }
+  }
+
+  // EPS
+  if (eps != null) {
+    if (eps > 0) {
+      rationale.push(`EPS of ${eps.toFixed(2)} — company is profitable on a trailing basis`);
+    } else {
+      score -= 1;
+      rationale.push(`Negative EPS (${eps.toFixed(2)}) — company is not yet profitable; speculative investment`);
+    }
+  }
+
+  // 52-week positioning
+  if (fiftyTwoWeekHigh != null && fiftyTwoWeekLow != null) {
+    const range = fiftyTwoWeekHigh - fiftyTwoWeekLow;
+    if (range > 0) {
+      const positionPct = ((price - fiftyTwoWeekLow) / range) * 100;
+      if (positionPct < 25) {
+        score += 1.5;
+        rationale.push(
+          `Price is in the bottom 25% of its 52-week range (${fiftyTwoWeekLow.toFixed(2)}–${fiftyTwoWeekHigh.toFixed(2)}) — potentially oversold on a yearly basis, attractive entry`
+        );
+      } else if (positionPct > 80) {
+        score -= 1;
+        rationale.push(
+          `Price is in the top 20% of its 52-week range (${fiftyTwoWeekLow.toFixed(2)}–${fiftyTwoWeekHigh.toFixed(2)}) — near yearly highs, limited upside margin`
+        );
+      } else {
+        rationale.push(
+          `Price is at ${positionPct.toFixed(0)}% of its 52-week range (${fiftyTwoWeekLow.toFixed(2)}–${fiftyTwoWeekHigh.toFixed(2)}) — mid-range positioning`
+        );
+      }
+    }
+  }
+
+  // Dividend yield — income bonus
+  if (dividendYield != null && dividendYield > 0) {
+    if (dividendYield > 4) {
+      score += 1;
+      rationale.push(`Dividend yield of ${dividendYield.toFixed(2)}% is high — strong income component suitable for buy-and-hold`);
+    } else if (dividendYield > 1.5) {
+      score += 0.5;
+      rationale.push(`Dividend yield of ${dividendYield.toFixed(2)}% provides a steady income cushion`);
+    }
+  } else {
+    rationale.push(`No dividend — returns are purely price-appreciation driven`);
+  }
+
+  // RSI as long-term sentiment gauge
+  if (rsi < 35) {
+    score += 1;
+    rationale.push(`RSI at ${rsi.toFixed(1)} — selling pressure may be exhausted, historically a good long-term accumulation zone`);
+  } else if (rsi > 70) {
+    score -= 0.5;
+    rationale.push(`RSI at ${rsi.toFixed(1)} — overbought on technicals; patient investors may wait for a better entry`);
+  }
+
+  return { recommendation: scoreToLabel(score), score, rationale };
 }
 
 // ── History helper ───────────────────────────────────────────────────────────
@@ -158,6 +378,8 @@ export interface AnalysisResult {
   news: string[];
   recommendation: string;
   score: number;
+  traderRec: RecommendationDetail;
+  investorRec: RecommendationDetail;
 }
 
 export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
@@ -237,14 +459,36 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   const fiftyTwoWeekLow: number | null = (summaryDetail?.fiftyTwoWeekLow as number | undefined) ?? null;
   const companyName: string | null = (price?.longName as string | undefined) ?? (price?.shortName as string | undefined) ?? null;
 
-  const { recommendation, score } = calcRecommendation(
+  const traderRec = calcTraderRecommendation(
     rsi,
     macdData.macd,
     macdData.signal,
+    macdData.histogram,
     currentPrice,
     sma50,
-    sma200
+    support,
+    resistance,
+    volume,
+    avgVolume,
+    closes
   );
+
+  const investorRec = calcInvestorRecommendation(
+    rsi,
+    currentPrice,
+    sma50,
+    sma200,
+    peRatio,
+    eps,
+    dividendYield,
+    fiftyTwoWeekHigh,
+    fiftyTwoWeekLow
+  );
+
+  // Legacy single recommendation: average of both scores
+  const combinedScore = (traderRec.score + investorRec.score) / 2;
+  const recommendation = scoreToLabel(combinedScore);
+  const score = combinedScore;
 
   // News
   const news: string[] = [];
@@ -289,6 +533,8 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
     news,
     recommendation,
     score,
+    traderRec,
+    investorRec,
   };
 }
 

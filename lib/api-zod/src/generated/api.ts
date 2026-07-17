@@ -66,8 +66,18 @@ export const AnalyzeStockResponse = zod.object({
   "spyPriceNorm": zod.number().nullish().describe('Normalized SPY price for comparison')
 })),
   "news": zod.array(zod.string()),
+  "recommendation": zod.string().describe('Combined recommendation. One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL'),
+  "score": zod.number().describe('Combined composite score'),
+  "traderRec": zod.object({
   "recommendation": zod.string().describe('One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL'),
-  "score": zod.number().describe('Composite score driving recommendation')
+  "score": zod.number().describe('Composite score driving recommendation'),
+  "rationale": zod.array(zod.string()).describe('Specific sentences explaining why this recommendation was reached')
+}).describe('Short-term recommendation based on technical signals (RSI, MACD, momentum, support\/resistance)'),
+  "investorRec": zod.object({
+  "recommendation": zod.string().describe('One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL'),
+  "score": zod.number().describe('Composite score driving recommendation'),
+  "rationale": zod.array(zod.string()).describe('Specific sentences explaining why this recommendation was reached')
+}).describe('Long-term recommendation based on fundamental and trend signals (P\/E, SMA200, 52-week range, dividend)')
 })
 
 

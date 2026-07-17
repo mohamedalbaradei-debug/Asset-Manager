@@ -47,6 +47,18 @@ export interface TechnicalExplanations {
   sma200: string;
 }
 
+/**
+ * A recommendation for either a trader (short-term technical) or investor (long-term fundamental)
+ */
+export interface RecommendationDetail {
+  /** One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL */
+  recommendation: string;
+  /** Composite score driving recommendation */
+  score: number;
+  /** Specific sentences explaining why this recommendation was reached */
+  rationale: string[];
+}
+
 export interface AnalysisResult {
   ticker: string;
   /** @nullable */
@@ -87,10 +99,14 @@ export interface AnalysisResult {
   explanations: TechnicalExplanations;
   historicalData: HistoricalDataPoint[];
   news: string[];
-  /** One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL */
+  /** Combined recommendation. One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL */
   recommendation: string;
-  /** Composite score driving recommendation */
+  /** Combined composite score */
   score: number;
+  /** Short-term recommendation based on technical signals (RSI, MACD, momentum, support/resistance) */
+  traderRec: RecommendationDetail;
+  /** Long-term recommendation based on fundamental and trend signals (P/E, SMA200, 52-week range, dividend) */
+  investorRec: RecommendationDetail;
 }
 
 export interface MacroDataEntry {

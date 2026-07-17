@@ -7,6 +7,7 @@
  */
 import type { HistoricalDataPoint } from './historicalDataPoint';
 import type { MacdValues } from './macdValues';
+import type { RecommendationDetail } from './recommendationDetail';
 import type { TechnicalExplanations } from './technicalExplanations';
 
 export interface AnalysisResult {
@@ -49,8 +50,12 @@ export interface AnalysisResult {
   explanations: TechnicalExplanations;
   historicalData: HistoricalDataPoint[];
   news: string[];
-  /** One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL */
+  /** Combined recommendation. One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL */
   recommendation: string;
-  /** Composite score driving recommendation */
+  /** Combined composite score */
   score: number;
+  /** Short-term recommendation based on technical signals (RSI, MACD, momentum, support/resistance) */
+  traderRec: RecommendationDetail;
+  /** Long-term recommendation based on fundamental and trend signals (P/E, SMA200, 52-week range, dividend) */
+  investorRec: RecommendationDetail;
 }

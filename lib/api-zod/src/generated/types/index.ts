@@ -15,5 +15,6 @@ export * from './historicalDataPoint';
 export * from './macdValues';
 export * from './macroDataEntry';
 export * from './macroMarketData';
+export * from './recommendationDetail';
 export * from './technicalExplanations';
 export * from './trendingTicker';
