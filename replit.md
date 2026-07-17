@@ -1,36 +1,47 @@
-# [Project name]
+# AI Investment Assistant
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A stock analysis terminal that gives self-directed investors real buy/sell/hold signals backed by live technical indicators, macroeconomic data, and market breadth metrics.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
+- `pnpm --filter @workspace/investment-app run dev` — run the frontend (port varies)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
+- Frontend: React + Vite + Tailwind + Recharts + Framer Motion
 - API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
+- Data: yahoo-finance2 (stock data), FRED API (macro data)
+- Validation: Zod (`zod/v4`), Orval codegen from OpenAPI spec
 - Build: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth for all API contracts)
+- `lib/api-client-react/src/generated/` — generated React Query hooks (do not hand-edit)
+- `lib/api-zod/src/generated/` — generated Zod schemas for server-side validation
+- `artifacts/api-server/src/lib/stockAnalysis.ts` — core technical analysis + yahoo-finance2 calls
+- `artifacts/api-server/src/lib/fredMacro.ts` — FRED API macro data fetcher
+- `artifacts/api-server/src/routes/analyze.ts` — POST /api/analyze route
+- `artifacts/api-server/src/routes/market.ts` — GET /api/macro and GET /api/trending routes
+- `artifacts/investment-app/src/` — React frontend
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Technical indicators are calculated manually** (RSI, EMA, MACD, SMA) instead of using the `technicalindicators` package, to avoid ESM/CJS interop issues with esbuild bundling.
+- **yahoo-finance2 v4 requires instantiation**: `import YahooFinanceClass from "yahoo-finance2"; const yahooFinance = new (YahooFinanceClass as any)()` — the default export is a class, not a singleton.
+- **In-memory cache** on `/api/macro` (30 min TTL) and `/api/trending` (5 min TTL) to avoid hammering Yahoo Finance and FRED on every page load.
+- **FRED_API_KEY** is stored as a shared env var (not a secret) since it's a public rate-limiting key.
+- Frontend chart uses Recharts with normalized price data (rebased to 100 at period start) for ticker vs S&P 500 comparison.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Terminal page (/)**: Enter any ticker symbol → get RSI, MACD, SMA50/SMA200 signals, support/resistance levels, fundamental data (P/E, Market Cap, EPS), normalized 6-month performance chart vs S&P 500, recent news, and a STRONG BUY / BUY / HOLD / SELL / STRONG SELL recommendation with composite score.
+- **Market Macro page (/market)**: Live GDP, CPI, inflation YoY, unemployment, Fed Funds Rate from FRED; VIX, 10Y yield, yield curve, and market breadth (% of mega-caps above 50-day MA) from Yahoo Finance; trending tickers table.
 
 ## User preferences
 
@@ -38,8 +49,6 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- After any OpenAPI spec change, run codegen before touching routes or frontend code.
+- yahoo-finance2 analysis calls take 3-8 seconds — the frontend shows an animated loading state while waiting.
+- `pnpm run dev` at workspace root has no script by design — run artifacts individually or via workflows.

@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AI Investment Assistant API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: analysis
+    description: Stock analysis operations
+  - name: market
+    description: Market-wide data operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /analyze:
+    post:
+      operationId: analyzeStock
+      tags: [analysis]
+      summary: Analyze a stock ticker
+      description: Returns full technical, fundamental, macro, and news analysis for a given ticker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisInput"
+      responses:
+        "200":
+          description: Full analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Ticker not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /macro:
+    get:
+      operationId: getMacroData
+      tags: [market]
+      summary: Get macro and market breadth data
+      description: Returns latest macroeconomic indicators and market breadth/liquidity metrics
+      responses:
+        "200":
+          description: Macro and breadth data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MacroMarketData"
+
+  /trending:
+    get:
+      operationId: getTrendingTickers
+      tags: [market]
+      summary: Get trending/popular tickers
+      description: Returns a quick snapshot of popular market tickers
+      responses:
+        "200":
+          description: List of trending tickers with basic stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendingTicker"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +101,211 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    AnalysisInput:
+      type: object
+      properties:
+        ticker:
+          type: string
+          description: Stock ticker symbol (e.g. AAPL, TSLA)
+          minLength: 1
+          maxLength: 10
+      required:
+        - ticker
+
+    HistoricalDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        price:
+          type: number
+        priceNorm:
+          type: number
+          description: Normalized price (rebased to 100 at period start)
+        spyPriceNorm:
+          type: ["number", "null"]
+          description: Normalized SPY price for comparison
+      required:
+        - date
+        - price
+        - priceNorm
+
+    MacdValues:
+      type: object
+      properties:
+        macd:
+          type: number
+        signal:
+          type: number
+        histogram:
+          type: number
+      required:
+        - macd
+        - signal
+        - histogram
+
+    TechnicalExplanations:
+      type: object
+      properties:
+        rsi:
+          type: string
+        macd:
+          type: string
+        sma50:
+          type: string
+        sma200:
+          type: string
+      required:
+        - rsi
+        - macd
+        - sma50
+        - sma200
+
+    AnalysisResult:
+      type: object
+      properties:
+        ticker:
+          type: string
+        companyName:
+          type: ["string", "null"]
+        currentPrice:
+          type: number
+        priceChange:
+          type: ["number", "null"]
+          description: Price change today in dollars
+        priceChangePct:
+          type: ["number", "null"]
+          description: Price change today as percentage
+        rsi:
+          type: number
+        macd:
+          $ref: "#/components/schemas/MacdValues"
+        sma50:
+          type: number
+        sma200:
+          type: number
+        support:
+          type: number
+        resistance:
+          type: number
+        peRatio:
+          type: ["number", "null"]
+        eps:
+          type: ["number", "null"]
+        dividendYield:
+          type: ["number", "null"]
+        marketCap:
+          type: ["number", "null"]
+        volume:
+          type: ["number", "null"]
+        avgVolume:
+          type: ["number", "null"]
+        fiftyTwoWeekHigh:
+          type: ["number", "null"]
+        fiftyTwoWeekLow:
+          type: ["number", "null"]
+        explanations:
+          $ref: "#/components/schemas/TechnicalExplanations"
+        historicalData:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoricalDataPoint"
+        news:
+          type: array
+          items:
+            type: string
+        recommendation:
+          type: string
+          description: "One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL"
+        score:
+          type: number
+          description: Composite score driving recommendation
+      required:
+        - ticker
+        - currentPrice
+        - rsi
+        - macd
+        - sma50
+        - sma200
+        - support
+        - resistance
+        - explanations
+        - historicalData
+        - news
+        - recommendation
+        - score
+
+    MacroDataEntry:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        status:
+          type: ["string", "null"]
+          description: "One of: bullish, neutral, bearish"
+      required:
+        - label
+        - value
+
+    BreadthDataEntry:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        status:
+          type: ["string", "null"]
+          description: "One of: bullish, neutral, bearish"
+      required:
+        - label
+        - value
+
+    MacroMarketData:
+      type: object
+      properties:
+        macro:
+          type: array
+          items:
+            $ref: "#/components/schemas/MacroDataEntry"
+        breadth:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreadthDataEntry"
+        updatedAt:
+          type: string
+      required:
+        - macro
+        - breadth
+        - updatedAt
+
+    TrendingTicker:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: ["string", "null"]
+        price:
+          type: number
+        change:
+          type: number
+        changePct:
+          type: number
+        marketCap:
+          type: ["number", "null"]
+      required:
+        - symbol
+        - price
+        - change
+        - changePct

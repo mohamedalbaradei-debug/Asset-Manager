@@ -1,0 +1,313 @@
+import os
+from flask import Flask, request, jsonify, render_template_string
+import yfinance as yf
+import pandas as pd
+import matplotlib.pyplot as plt
+import pandas_ta as ta
+from fredapi import Fred
+import io
+import base64
+import warnings
+warnings.filterwarnings('ignore')
+
+app = Flask(__name__)
+
+FRED_API_KEY = "a13c883577fbf5c7b745d18690fa2eca"
+
+def get_macro_data():
+    try:
+        fred = Fred(api_key=FRED_API_KEY)
+        gdp = fred.get_series('GDP').iloc[-1]
+        real_gdp = fred.get_series('GDPC1').iloc[-1]
+        cpi = fred.get_series('CPIAUCSL').iloc[-1]
+        unemployment = fred.get_series('UNRATE').iloc[-1]
+        fed_funds = fred.get_series('FEDFUNDS').iloc[-1]
+        cpi_series = fred.get_series('CPIAUCSL')
+        inflation_yoy = ((cpi_series.iloc[-1] / cpi_series.iloc[-13]) - 1) * 100
+        return {
+            "GDP": f"${gdp/1000:.2f} Trillion",
+            "Real GDP": f"${real_gdp/1000:.2f} Trillion",
+            "CPI": f"{cpi:.2f}",
+            "Inflation (YoY)": f"{inflation_yoy:.2f}%",
+            "Unemployment Rate": f"{unemployment:.2f}%",
+            "Fed Funds Rate": f"{fed_funds:.2f}%"
+        }
+    except:
+        return {"Error": "FRED unavailable"}
+
+def get_breadth_liquidity():
+    try:
+        tnx = yf.Ticker("^TNX").history(period="5d")['Close'].iloc[-1]
+        fvx = yf.Ticker("^FVX").history(period="5d")['Close'].iloc[-1]
+        yield_spread = tnx - fvx
+        vix = yf.Ticker("^VIX").history(period="5d")['Close'].iloc[-1]
+        mega = ["AAPL","MSFT","GOOGL","AMZN","NVDA","META","TSLA","BRK-B","JPM","JNJ"]
+        above = 0
+        for t in mega:
+            try:
+                d = yf.Ticker(t).history(period="3mo")
+                if len(d)>=50 and d['Close'].iloc[-1] > d['Close'].rolling(50).mean().iloc[-1]:
+                    above += 1
+            except: pass
+        pct = round((above/len(mega))*100,1)
+        if pct>70 and vix<20:
+            bstat = "🟢 Healthy"
+            lstat = "🟢 Normal"
+        elif pct<30 or vix>30:
+            bstat = "🔴 Weak"
+            lstat = "🔴 Tight"
+        else:
+            bstat = "🟡 Neutral"
+            lstat = "🟡 Neutral"
+        return {
+            "Stocks Above 50-day MA": f"{pct}%",
+            "Breadth Status": bstat,
+            "VIX": f"{vix:.2f}",
+            "10Y Yield": f"{tnx:.2f}%",
+            "Yield Curve": f"{yield_spread:.2f}%",
+            "Liquidity Status": lstat
+        }
+    except:
+        return {"Error": "Breadth unavailable"}
+
+def explain_technicals(rsi, macd, sma50, sma200, price):
+    ex = {}
+    if rsi>70: ex["RSI"] = f"🔴 Overbought ({rsi:.1f}) – may pull back."
+    elif rsi<30: ex["RSI"] = f"🟢 Oversold ({rsi:.1f}) – may bounce."
+    else: ex["RSI"] = f"🟡 Neutral ({rsi:.1f})."
+    if macd['MACD'] > macd['Signal']:
+        ex["MACD"] = "🟢 Bullish momentum."
+    else:
+        ex["MACD"] = "🔴 Bearish momentum."
+    if price > sma50:
+        ex["SMA50"] = f"🟢 Price above 50-day SMA (${sma50:.2f})."
+    else:
+        ex["SMA50"] = f"🔴 Price below 50-day SMA (${sma50:.2f})."
+    if price > sma200:
+        ex["SMA200"] = f"🟢 Price above 200-day SMA (${sma200:.2f})."
+    else:
+        ex["SMA200"] = f"🔴 Price below 200-day SMA (${sma200:.2f})."
+    return ex
+
+def run_analysis(ticker):
+    ticker = ticker.upper()
+    stock = yf.Ticker(ticker)
+    df = stock.history(period="6mo")
+    if df.empty:
+        return {"Error": "Ticker not found."}
+    spy = yf.Ticker("SPY").history(period="6mo")
+    if spy.empty:
+        spy = yf.download("SPY", period="6mo")  # fallback
+        if spy.empty:
+            spy = None
+    price = df['Close'].iloc[-1]
+    df.ta.rsi(append=True)
+    df.ta.macd(append=True)
+    df.ta.sma(length=50, append=True)
+    df.ta.sma(length=200, append=True)
+    rsi = df['RSI_14'].iloc[-1]
+    macd = {
+        'MACD': df['MACD_12_26_9'].iloc[-1],
+        'Signal': df['MACDs_12_26_9'].iloc[-1],
+        'Hist': df['MACDh_12_26_9'].iloc[-1]
+    }
+    sma50 = df['SMA_50'].iloc[-1]
+    sma200 = df['SMA_200'].iloc[-1]
+    support = df['Low'].rolling(60).min().iloc[-1]
+    resistance = df['High'].rolling(60).max().iloc[-1]
+    info = stock.info
+    pe = info.get('trailingPE','N/A')
+    eps = info.get('trailingEps','N/A')
+    div = info.get('dividendYield','N/A')
+    mcap = info.get('marketCap','N/A')
+    if mcap!='N/A': mcap = f"${mcap/1e9:.2f}B"
+
+    fig, ax = plt.subplots(figsize=(10,5))
+    t_norm = (df['Close']/df['Close'].iloc[0])*100
+    if spy is not None and not spy.empty:
+        s_norm = (spy['Close']/spy['Close'].iloc[0])*100
+        ax.plot(s_norm, label='S&P 500', color='red', ls='--', lw=2)
+    ax.plot(t_norm, label=ticker, color='blue', lw=2)
+    ax.axhline(100, color='gray', ls=':', alpha=0.5)
+    ax.set_title(f'{ticker} vs S&P 500 (Normalized)')
+    ax.legend(); ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    img = base64.b64encode(buf.getvalue()).decode()
+    plt.close(fig)
+    plot_url = f"data:image/png;base64,{img}"
+
+    expl = explain_technicals(rsi, macd, sma50, sma200, price)
+    macro = get_macro_data()
+    breadth = get_breadth_liquidity()
+    try:
+        news = [n['title'] for n in stock.news[:5]]
+    except:
+        news = ["News not available."]
+
+    score = 0
+    if rsi<30: score+=1
+    if rsi>70: score-=1
+    if macd['MACD']>macd['Signal']: score+=1
+    else: score-=1
+    if price>sma50: score+=0.5
+    else: score-=0.5
+    if price>sma200: score+=0.5
+    else: score-=0.5
+    if score>=2.5: rec = "🚀 STRONG BUY"
+    elif score>=1: rec = "📈 BUY"
+    elif score>=-0.5: rec = "✋ HOLD"
+    elif score>=-2: rec = "📉 SELL"
+    else: rec = "💀 STRONG SELL"
+
+    return {
+        "Ticker": ticker,
+        "Current Price": round(price,2),
+        "RSI": round(rsi,2),
+        "MACD": macd,
+        "SMA50": round(sma50,2),
+        "SMA200": round(sma200,2),
+        "Support": round(support,2),
+        "Resistance": round(resistance,2),
+        "P/E Ratio": pe,
+        "EPS": eps,
+        "Dividend Yield": div,
+        "Market Cap": mcap,
+        "Explanations": expl,
+        "Plot": plot_url,
+        "Macro": macro,
+        "Breadth": breadth,
+        "News": news,
+        "Recommendation": rec
+    }
+
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Investment Bot</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background:#0b0e14; color:#e0e6ed; display:flex; justify-content:center; padding:30px; }
+        .container { max-width:1200px; width:100%; }
+        h1 { font-size:2.5rem; margin-bottom:10px; color:#4fc3f7; }
+        .sub { color:#8895aa; margin-bottom:25px; }
+        .search-box { display:flex; gap:12px; margin-bottom:30px; flex-wrap:wrap; }
+        .search-box input { flex:1; padding:14px 20px; border-radius:30px; border:none; background:#1e2633; color:white; font-size:1.1rem; min-width:200px; }
+        .search-box input:focus { outline:2px solid #4fc3f7; }
+        .search-box button { padding:14px 35px; border-radius:30px; border:none; background:#4fc3f7; color:#0b0e14; font-weight:bold; font-size:1.1rem; cursor:pointer; }
+        .search-box button:hover { background:#81d4fa; transform:scale(1.02); }
+        .loader { display:none; text-align:center; padding:40px; color:#4fc3f7; font-size:1.2rem; }
+        .card { background:#141b24; border-radius:16px; padding:24px; margin-bottom:24px; border:1px solid #2a3442; }
+        .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+        @media (max-width:700px) { .grid-2 { grid-template-columns:1fr; } }
+        .metric { background:#1e2633; padding:16px; border-radius:12px; text-align:center; border-left:4px solid #4fc3f7; }
+        .metric .label { color:#8895aa; font-size:0.9rem; text-transform:uppercase; }
+        .metric .value { font-size:1.8rem; font-weight:bold; margin-top:4px; }
+        .rec-box { background:#1e2633; padding:18px; border-radius:12px; text-align:center; font-size:1.8rem; font-weight:bold; border:2px solid #4fc3f7; }
+        .news-item { padding:8px 0; border-bottom:1px solid #1e2633; }
+        .explain-item { background:#1e2633; padding:12px 16px; border-radius:8px; margin-bottom:8px; }
+        img { width:100%; border-radius:12px; background:#0b0e14; }
+        .macro-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .macro-item { background:#1e2633; padding:10px; border-radius:8px; }
+        .error { color:#ef5350; background:#2a1520; padding:20px; border-radius:12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📊 AI Investment Assistant</h1>
+    <p class="sub">Enter a stock ticker for a complete Buy / Sell / Hold analysis with live macro data.</p>
+    <div class="search-box">
+        <input type="text" id="tickerInput" placeholder="e.g. AAPL, TSLA, MSFT" value="AAPL">
+        <button onclick="analyze()">🔍 Analyze</button>
+    </div>
+    <div id="loader" class="loader">⏳ Fetching data...</div>
+    <div id="results"></div>
+</div>
+<script>
+function analyze() {
+    const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+    if (!ticker) return;
+    document.getElementById('loader').style.display = 'block';
+    document.getElementById('results').innerHTML = '';
+    fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker: ticker })
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('loader').style.display = 'none';
+        if (data.Error) {
+            document.getElementById('results').innerHTML = `<div class="card error">❌ ${data.Error}</div>`;
+            return;
+        }
+        renderResults(data);
+    })
+    .catch(err => {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('results').innerHTML = `<div class="card error">❌ Network error: ${err}</div>`;
+    });
+}
+function renderResults(d) {
+    let html = '';
+    html += `<div class="card"><div class="grid-2">
+        <div class="metric"><div class="label">Current Price</div><div class="value">$${d['Current Price']}</div></div>
+        <div class="metric"><div class="label">RSI</div><div class="value">${d['RSI']}</div></div>
+    </div>
+    <div class="rec-box" style="margin-top:15px;">📌 Recommendation: ${d['Recommendation']}</div>
+    </div>`;
+    html += `<div class="card"><h3>📈 Performance vs S&P 500</h3><img src="${d['Plot']}"></div>`;
+    html += `<div class="card"><div class="grid-2">
+        <div><h4>📊 Key Levels</h4>
+            <p><strong>Support:</strong> $${d['Support']}</p>
+            <p><strong>Resistance:</strong> $${d['Resistance']}</p>
+            <p><strong>SMA50:</strong> $${d['SMA50']}</p>
+            <p><strong>SMA200:</strong> $${d['SMA200']}</p>
+            <p><strong>P/E:</strong> ${d['P/E Ratio']}</p>
+            <p><strong>Market Cap:</strong> ${d['Market Cap']}</p>
+        </div>
+        <div><h4>📘 Explanations</h4>`;
+    for (const [k,v] of Object.entries(d['Explanations'])) {
+        html += `<div class="explain-item">🔹 <strong>${k}:</strong> ${v}</div>`;
+    }
+    html += `</div></div></div>`;
+    html += `<div class="card"><div class="grid-2">
+        <div><h4>🌍 Macro</h4><div class="macro-grid">`;
+    for (const [k,v] of Object.entries(d['Macro'])) {
+        html += `<div class="macro-item"><strong>${k}:</strong> ${v}</div>`;
+    }
+    html += `</div></div><div><h4>🌊 Breadth & Liquidity</h4><div class="macro-grid">`;
+    for (const [k,v] of Object.entries(d['Breadth'])) {
+        html += `<div class="macro-item"><strong>${k}:</strong> ${v}</div>`;
+    }
+    html += `</div></div></div></div>`;
+    html += `<div class="card"><h4>📰 News</h4>`;
+    d['News'].forEach(item => html += `<div class="news-item">• ${item}</div>`);
+    html += `</div>`;
+    document.getElementById('results').innerHTML = html;
+}
+window.onload = function() { analyze(); };
+</script>
+</body>
+</html>
+"""
+
+@app.route('/')
+def index():
+    return render_template_string(HTML)
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    data = request.get_json()
+    ticker = data.get('ticker', 'AAPL')
+    result = run_analysis(ticker)
+    return jsonify(result)
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
