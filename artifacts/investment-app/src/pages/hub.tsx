@@ -568,7 +568,7 @@ export default function HubPage() {
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[72vh] overflow-y-auto pr-1 scrollbar-thin">
             {trendingTickers?.map((t) => (
               <div
                 key={t.symbol}

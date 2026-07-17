@@ -203,27 +203,58 @@ function CommodityCard({ c }: { c: CommodityEntry }) {
 // ── Ticker type helpers ───────────────────────────────────────────────────────
 
 function tickerRegion(symbol: string): string {
-  if (symbol.startsWith("^N225"))        return "Japan";
-  if (symbol.startsWith("^FTSE"))        return "United Kingdom";
-  if (symbol.startsWith("^GDAXI"))       return "Germany";
-  if (symbol.startsWith("^FCHI"))        return "France";
-  if (symbol.startsWith("^KS11"))        return "South Korea";
-  if (symbol.startsWith("^HSI"))         return "Hong Kong";
-  if (symbol.startsWith("^NSEI"))        return "India";
-  if (symbol.startsWith("^AXJO"))        return "Australia";
-  if (symbol.startsWith("^GSPTSE"))      return "Canada";
-  if (symbol.startsWith("^BVSP"))        return "Brazil";
-  if (symbol.startsWith("^STOXX50E"))    return "Europe";
-  if (symbol.startsWith("^IBEX"))        return "Spain";
-  if (symbol.startsWith("^SSMI"))        return "Switzerland";
-  if (symbol.startsWith("^CASE"))        return "Egypt";
-  if (symbol === "000001.SS")            return "China";
-  if (symbol === "BTC-USD")              return "Crypto";
-  if (symbol === "ETH-USD")             return "Crypto";
-  if (symbol === "GC=F")                return "Commodity";
-  if (symbol === "CL=F")                return "Commodity";
-  if (["DIA","IWM","QQQ","SPY"].includes(symbol)) return "US ETF";
-  if (symbol.startsWith("^"))           return "Index";
+  // Commodities & Crypto
+  if (["GC=F","CL=F","SI=F","NG=F"].includes(symbol)) return "Commodity";
+  if (symbol.endsWith("-USD") || symbol.endsWith("-USDT")) return "Crypto";
+  // US ETFs
+  if (["SPY","QQQ","DIA","IWM","VTI","VOO","GLD","SLV","XLF","XLE","XLK","XLV","ARKK"].includes(symbol)) return "US ETF";
+  // Asia-Pacific indices
+  if (symbol === "^N225")      return "Japan";
+  if (symbol === "^TWII")      return "Taiwan";
+  if (symbol === "^HSI")       return "Hong Kong";
+  if (symbol === "000001.SS")  return "China";
+  if (symbol === "399001.SZ")  return "China";
+  if (symbol === "^KS11")      return "South Korea";
+  if (symbol === "^NSEI" || symbol === "^BSESN") return "India";
+  if (symbol === "^AXJO")      return "Australia";
+  if (symbol === "^NZ50")      return "New Zealand";
+  if (symbol === "^STI")       return "Singapore";
+  if (symbol === "^JKSE")      return "Indonesia";
+  if (symbol === "^KLSE")      return "Malaysia";
+  // European indices
+  if (symbol === "^FTSE")      return "United Kingdom";
+  if (symbol === "^GDAXI")     return "Germany";
+  if (symbol === "^FCHI")      return "France";
+  if (symbol === "^STOXX50E")  return "Europe";
+  if (symbol === "^AEX")       return "Netherlands";
+  if (symbol === "^IBEX")      return "Spain";
+  if (symbol === "^SSMI")      return "Switzerland";
+  if (symbol === "^ATX")       return "Austria";
+  if (symbol === "^BFX")       return "Belgium";
+  if (symbol === "^OSEAX")     return "Norway";
+  if (symbol === "^OMXS30")    return "Sweden";
+  if (symbol === "^OMXC25")    return "Denmark";
+  if (symbol === "^GSPTSE")    return "Canada";
+  // Middle East & Africa
+  if (symbol === "^CASE30")    return "Egypt";
+  if (symbol === "^TA125.TA" || symbol === "^TA35") return "Israel";
+  if (symbol === "^XU100")     return "Turkey";
+  // Latin America
+  if (symbol === "^BVSP")      return "Brazil";
+  if (symbol === "^MXX")       return "Mexico";
+  if (symbol === "^MERV")      return "Argentina";
+  if (symbol === "^IPSA")      return "Chile";
+  // International ADRs / cross-listings
+  if (symbol === "TSM")        return "Taiwan";
+  if (symbol === "ASML")       return "Netherlands";
+  if (symbol === "BABA" || symbol === "NIO") return "China";
+  if (symbol === "SAP")        return "Germany";
+  if (symbol === "TM" || symbol === "SONY") return "Japan";
+  if (symbol === "HDB")        return "India";
+  if (symbol === "SHOP")       return "Canada";
+  if (symbol === "ARM")        return "United Kingdom";
+  // Anything else with ^ is an index
+  if (symbol.startsWith("^"))  return "Index";
   return "United States";
 }
 

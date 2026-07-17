@@ -627,28 +627,70 @@ export async function fetchCommoditiesAndCrypto(): Promise<CommodityData[]> {
 // ── Trending tickers ─────────────────────────────────────────────────────────
 
 const TRENDING_SYMBOLS = [
-  // US Large Caps
-  "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "JPM", "V", "WMT",
-  // US ETFs
-  "SPY", "QQQ", "DIA", "IWM",
-  // Commodities & Crypto
+  // ── US Large Caps ────────────────────────────────────────────────────────
+  "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "JPM", "V",   "WMT",
+  "BRK-B","XOM",  "UNH",  "JNJ",  "PG",   "CVX",  "HD",   "BAC", "KO",  "LLY",
+  "ABBV", "MRK",  "COST", "AVGO", "ACN",  "MCD",  "NKE",  "TXN", "PM",  "MS",
+  "GS",   "AMD",  "INTC", "QCOM", "CRM",  "ADBE", "NFLX", "ORCL",
+
+  // ── US ETFs ──────────────────────────────────────────────────────────────
+  "SPY", "QQQ", "DIA", "IWM", "VTI", "VOO",
+  "GLD", "SLV", "XLF", "XLE", "XLK", "XLV", "ARKK",
+
+  // ── Commodities & Crypto ─────────────────────────────────────────────────
   "GC=F", "CL=F", "BTC-USD", "ETH-USD",
-  // Global Indices
-  "^N225",     // Nikkei 225 — Japan
-  "^FTSE",     // FTSE 100 — United Kingdom
-  "^GDAXI",    // DAX — Germany
-  "^FCHI",     // CAC 40 — France
-  "^KS11",     // KOSPI — South Korea
-  "^HSI",      // Hang Seng — Hong Kong
-  "^NSEI",     // Nifty 50 — India
-  "^AXJO",     // ASX 200 — Australia
-  "^GSPTSE",   // S&P/TSX Composite — Canada
-  "^BVSP",     // Bovespa — Brazil
-  "^STOXX50E", // Euro Stoxx 50 — Europe
-  "^IBEX",     // IBEX 35 — Spain
-  "^SSMI",     // SMI — Switzerland
-  "^CASE30",   // EGX30 — Egypt
-  "000001.SS", // Shanghai Composite — China
+
+  // ── Asia-Pacific Indices ─────────────────────────────────────────────────
+  "^N225",     // Nikkei 225        — Japan
+  "^TWII",     // TSEC Weighted     — Taiwan
+  "^HSI",      // Hang Seng         — Hong Kong
+  "000001.SS", // Shanghai Comp.    — China
+  "399001.SZ", // Shenzhen Comp.    — China
+  "^KS11",     // KOSPI             — South Korea
+  "^NSEI",     // Nifty 50          — India
+  "^AXJO",     // ASX 200           — Australia
+  "^NZ50",     // NZX 50            — New Zealand
+  "^STI",      // Straits Times     — Singapore
+  "^JKSE",     // IDX Composite     — Indonesia
+  "^KLSE",     // KLCI              — Malaysia
+
+  // ── European Indices ─────────────────────────────────────────────────────
+  "^FTSE",     // FTSE 100          — United Kingdom
+  "^GDAXI",    // DAX               — Germany
+  "^FCHI",     // CAC 40            — France
+  "^STOXX50E", // Euro Stoxx 50     — Europe
+  "^AEX",      // AEX               — Netherlands
+  "^IBEX",     // IBEX 35           — Spain
+  "^SSMI",     // SMI               — Switzerland
+  "^ATX",      // ATX               — Austria
+  "^BFX",      // BEL 20            — Belgium
+  "^OSEAX",    // Oslo All-Share     — Norway
+  "^OMXS30",   // OMX Stockholm 30  — Sweden
+  "^OMXC25",   // OMX Copenhagen 25 — Denmark
+  "^GSPTSE",   // TSX Composite     — Canada
+
+  // ── Middle East & Africa Indices ─────────────────────────────────────────
+  "^CASE30",   // EGX 30            — Egypt
+  "^TA125.TA", // TA-125            — Israel
+  "^XU100",    // BIST 100          — Turkey
+
+  // ── Latin America Indices ────────────────────────────────────────────────
+  "^BVSP",     // Bovespa           — Brazil
+  "^MXX",      // S&P/BMV IPC       — Mexico
+  "^MERV",     // MERVAL            — Argentina
+  "^IPSA",     // S&P IPSA          — Chile
+
+  // ── International Stocks (US-listed ADRs & cross-listings) ───────────────
+  "TSM",  // Taiwan Semiconductor   — Taiwan
+  "ASML", // ASML Holding           — Netherlands
+  "BABA", // Alibaba                — China
+  "SAP",  // SAP SE                 — Germany
+  "TM",   // Toyota Motor           — Japan
+  "SONY", // Sony Group             — Japan
+  "HDB",  // HDFC Bank              — India
+  "SHOP", // Shopify                — Canada
+  "ARM",  // Arm Holdings           — United Kingdom
+  "NIO",  // NIO Inc.               — China
 ];
 
 export interface TrendingTickerData {
