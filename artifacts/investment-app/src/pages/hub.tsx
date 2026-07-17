@@ -1,5 +1,5 @@
-import React, { Activity } from "react";
-import { Search, Loader2, ArrowUpRight, ArrowDownRight, Minus, BarChart3, AlertCircle } from "lucide-react";
+import React from "react";
+import { Search, Loader2, ArrowUpRight, ArrowDownRight, Minus, BarChart3, AlertCircle, Activity } from "lucide-react";
 import { useAnalyzeStock, useGetTrendingTickers, getGetTrendingTickersQueryKey } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import {
