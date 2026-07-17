@@ -538,10 +538,117 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   };
 }
 
+// ── Commodities & Crypto ─────────────────────────────────────────────────────
+
+export interface CommodityData {
+  symbol: string;
+  label: string;
+  price: number;
+  change: number;
+  changePct: number;
+  currency: string;
+  status: string; // equity effect: bullish | neutral | bearish
+  equityImpact: string;
+}
+
+export async function fetchCommoditiesAndCrypto(): Promise<CommodityData[]> {
+  const ASSETS = [
+    { symbol: "GC=F",    label: "Gold" },
+    { symbol: "CL=F",    label: "WTI Crude Oil" },
+    { symbol: "BTC-USD", label: "Bitcoin" },
+  ];
+
+  const results = await Promise.allSettled(
+    ASSETS.map((a) => yahooFinance.quoteSummary(a.symbol, { modules: ["price"] }))
+  );
+
+  return results
+    .map((r, i) => {
+      if (r.status !== "fulfilled") return null;
+      const p = r.value.price;
+      if (!p || p.regularMarketPrice == null) return null;
+
+      const price    = p.regularMarketPrice as number;
+      const change   = (p.regularMarketChange as number | undefined) ?? 0;
+      const changePct =
+        p.regularMarketChangePercent != null
+          ? (p.regularMarketChangePercent as number) * 100
+          : 0;
+      const currency = (p.currency as string | undefined) ?? "USD";
+      const { symbol, label } = ASSETS[i];
+
+      let status: string;
+      let equityImpact: string;
+
+      if (symbol === "GC=F") {
+        if (changePct > 1.5) {
+          status = "bearish";
+          equityImpact = `Gold rising ${changePct.toFixed(1)}% signals risk-off sentiment — investors fleeing to safety. Rising gold typically puts downward pressure on equities as capital rotates away from risk assets.`;
+        } else if (changePct < -1.5) {
+          status = "bullish";
+          equityImpact = `Gold falling ${Math.abs(changePct).toFixed(1)}% signals risk-on appetite — capital is rotating out of safe havens and back into equities. Historically bullish for stock markets.`;
+        } else {
+          status = "neutral";
+          equityImpact = `Gold moving sideways — no strong flight-to-safety or risk-on signal. Equities are not receiving a directional impulse from gold today.`;
+        }
+      } else if (symbol === "CL=F") {
+        if (changePct > 3) {
+          status = "bearish";
+          equityImpact = `Oil surging ${changePct.toFixed(1)}% raises inflation expectations and squeezes corporate margins — bearish for equities, especially consumer discretionary and transportation sectors. Energy stocks may benefit temporarily.`;
+        } else if (changePct < -3) {
+          status = "bearish";
+          equityImpact = `Oil plunging ${Math.abs(changePct).toFixed(1)}% may reflect deteriorating global demand and growth fears — a bearish macro signal. Energy sector will face earnings pressure.`;
+        } else if (changePct > 1.2) {
+          status = "neutral";
+          equityImpact = `Oil up modestly ${changePct.toFixed(1)}% — suggests steady demand. Watch for inflation pass-through if sustained. Mixed signal for equities.`;
+        } else {
+          status = "neutral";
+          equityImpact = `Oil relatively stable — neutral for equity markets. No significant inflation or demand shock signal today.`;
+        }
+      } else {
+        // Bitcoin
+        if (changePct > 4) {
+          status = "bullish";
+          equityImpact = `Bitcoin up ${changePct.toFixed(1)}% — strong risk-on appetite. Crypto rallies historically correlate with gains in tech, growth stocks, and high-beta equities as investors seek higher returns.`;
+        } else if (changePct < -4) {
+          status = "bearish";
+          equityImpact = `Bitcoin down ${Math.abs(changePct).toFixed(1)}% — risk-off signal. Crypto sell-offs often precede pressure on tech and high-multiple growth stocks, as both attract similar speculative capital.`;
+        } else {
+          status = "neutral";
+          equityImpact = `Bitcoin moving sideways — no strong directional signal for risk assets. Equity markets are not receiving a sentiment push from crypto today.`;
+        }
+      }
+
+      return { symbol, label, price, change, changePct, currency, status, equityImpact };
+    })
+    .filter((d): d is CommodityData => d !== null);
+}
+
 // ── Trending tickers ─────────────────────────────────────────────────────────
 
 const TRENDING_SYMBOLS = [
-  "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "SPY", "QQQ", "JPM",
+  // US Large Caps
+  "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "JPM", "V", "WMT",
+  // US ETFs
+  "SPY", "QQQ", "DIA", "IWM",
+  // Commodities & Crypto
+  "GC=F", "CL=F", "BTC-USD", "ETH-USD",
+  // Global Indices
+  "^N225",     // Nikkei 225 — Japan
+  "^FTSE",     // FTSE 100 — United Kingdom
+  "^GDAXI",    // DAX — Germany
+  "^FCHI",     // CAC 40 — France
+  "^KS11",     // KOSPI — South Korea
+  "^HSI",      // Hang Seng — Hong Kong
+  "^NSEI",     // Nifty 50 — India
+  "^AXJO",     // ASX 200 — Australia
+  "^GSPTSE",   // S&P/TSX Composite — Canada
+  "^BVSP",     // Bovespa — Brazil
+  "^STOXX50E", // Euro Stoxx 50 — Europe
+  "^IBEX",     // IBEX 35 — Spain
+  "^SSMI",     // SMI — Switzerland
+  "^CASE30",   // EGX30 — Egypt
+  "000001.SS", // Shanghai Composite — China
 ];
 
 export interface TrendingTickerData {

@@ -96,6 +96,22 @@ export const GetMacroDataResponse = zod.object({
   "value": zod.string(),
   "status": zod.string().nullish().describe('One of: bullish, neutral, bearish')
 })),
+  "fearGreed": zod.object({
+  "score": zod.number().describe('0 (Extreme Fear) to 100 (Extreme Greed)'),
+  "label": zod.string().describe('One of: Extreme Fear, Fear, Neutral, Greed, Extreme Greed'),
+  "description": zod.string().describe('Plain-language interpretation of the current reading'),
+  "status": zod.string().describe('Contrarian equity signal — one of: bullish, neutral, bearish')
+}).describe('Composite Fear & Greed index derived from VIX, market breadth, and yield curve'),
+  "commodities": zod.array(zod.object({
+  "symbol": zod.string(),
+  "label": zod.string(),
+  "price": zod.number(),
+  "change": zod.number(),
+  "changePct": zod.number(),
+  "currency": zod.string(),
+  "status": zod.string().describe('Effect on equities — one of: bullish, neutral, bearish'),
+  "equityImpact": zod.string().describe('Plain-language explanation of how today\'s move affects equity markets')
+}).describe('Price and equity-impact data for a commodity or crypto asset')),
   "updatedAt": zod.string()
 })
 

@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BreadthDataEntry } from './breadthDataEntry';
+import type { CommodityEntry } from './commodityEntry';
+import type { FearGreedData } from './fearGreedData';
 import type { MacroDataEntry } from './macroDataEntry';
 
 export interface MacroMarketData {
   macro: MacroDataEntry[];
   breadth: BreadthDataEntry[];
+  fearGreed: FearGreedData;
+  commodities: CommodityEntry[];
   updatedAt: string;
 }

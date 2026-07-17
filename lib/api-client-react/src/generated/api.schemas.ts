@@ -129,9 +129,41 @@ export interface BreadthDataEntry {
   status?: string | null;
 }
 
+/**
+ * Composite Fear & Greed index derived from VIX, market breadth, and yield curve
+ */
+export interface FearGreedData {
+  /** 0 (Extreme Fear) to 100 (Extreme Greed) */
+  score: number;
+  /** One of: Extreme Fear, Fear, Neutral, Greed, Extreme Greed */
+  label: string;
+  /** Plain-language interpretation of the current reading */
+  description: string;
+  /** Contrarian equity signal — one of: bullish, neutral, bearish */
+  status: string;
+}
+
+/**
+ * Price and equity-impact data for a commodity or crypto asset
+ */
+export interface CommodityEntry {
+  symbol: string;
+  label: string;
+  price: number;
+  change: number;
+  changePct: number;
+  currency: string;
+  /** Effect on equities — one of: bullish, neutral, bearish */
+  status: string;
+  /** Plain-language explanation of how today's move affects equity markets */
+  equityImpact: string;
+}
+
 export interface MacroMarketData {
   macro: MacroDataEntry[];
   breadth: BreadthDataEntry[];
+  fearGreed: FearGreedData;
+  commodities: CommodityEntry[];
   updatedAt: string;
 }
 

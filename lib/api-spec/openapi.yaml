@@ -299,6 +299,60 @@ components:
         - label
         - value
 
+    FearGreedData:
+      type: object
+      description: Composite Fear & Greed index derived from VIX, market breadth, and yield curve
+      properties:
+        score:
+          type: number
+          description: 0 (Extreme Fear) to 100 (Extreme Greed)
+        label:
+          type: string
+          description: "One of: Extreme Fear, Fear, Neutral, Greed, Extreme Greed"
+        description:
+          type: string
+          description: Plain-language interpretation of the current reading
+        status:
+          type: string
+          description: "Contrarian equity signal — one of: bullish, neutral, bearish"
+      required:
+        - score
+        - label
+        - description
+        - status
+
+    CommodityEntry:
+      type: object
+      description: Price and equity-impact data for a commodity or crypto asset
+      properties:
+        symbol:
+          type: string
+        label:
+          type: string
+        price:
+          type: number
+        change:
+          type: number
+        changePct:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          description: "Effect on equities — one of: bullish, neutral, bearish"
+        equityImpact:
+          type: string
+          description: Plain-language explanation of how today's move affects equity markets
+      required:
+        - symbol
+        - label
+        - price
+        - change
+        - changePct
+        - currency
+        - status
+        - equityImpact
+
     MacroMarketData:
       type: object
       properties:
@@ -310,11 +364,19 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BreadthDataEntry"
+        fearGreed:
+          $ref: "#/components/schemas/FearGreedData"
+        commodities:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommodityEntry"
         updatedAt:
           type: string
       required:
         - macro
         - breadth
+        - fearGreed
+        - commodities
         - updatedAt
 
     TrendingTicker:
