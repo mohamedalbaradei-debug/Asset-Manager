@@ -1,0 +1,506 @@
+import { yahooFinance } from "./yahoo";
+import { callGreeks, putGreeks } from "./blackScholes";
+import { logger } from "./logger";
+
+/**
+ * Options-flow analytics built on the free Yahoo Finance chain.
+ *
+ * Yahoo provides strike, IV, bid/ask, volume and open interest but not the
+ * advanced greeks — so delta/gamma/charm and the GEX / net-flow figures are
+ * computed locally with the Black-Scholes model. This matches how free GEX
+ * dashboards derive their numbers.
+ */
+
+const RISK_FREE_RATE = 0.0425;
+
+interface OptionContract {
+  strike: number;
+  volume?: number;
+  openInterest?: number;
+  impliedVolatility: number;
+  inTheMoney: boolean;
+}
+
+function toYears(expiration: Date, now: Date): number {
+  return Math.max((expiration.getTime() - now.getTime()) / (365 * 24 * 3600 * 1000), 1 / (365 * 24));
+}
+
+async function fetchChain(ticker: string) {
+  const data = await yahooFinance.options(ticker);
+  const spot = (data.quote?.regularMarketPrice as number | undefined) ?? null;
+  const options = (data.options ?? []) as Array<{
+    expirationDate: Date;
+    calls: OptionContract[];
+    puts: OptionContract[];
+  }>;
+  return { data, spot, options };
+}
+
+// ── Options flow (put/call ratio + unusual activity) ─────────────────────────
+
+export interface OptionsFlowResult {
+  available: boolean;
+  ticker: string;
+  expiration: string | null;
+  putCallVolumeRatio: number | null;
+  putCallOpenInterestRatio: number | null;
+  totalCallVolume: number;
+  totalPutVolume: number;
+  totalOpenInterest: number;
+  unusualActivity: boolean;
+  unusualNote: string | null;
+  premiumFlow: number | null;
+  signal: "bullish" | "bearish" | "neutral";
+  interpretation: string;
+}
+
+export async function analyzeOptionsFlow(ticker: string): Promise<OptionsFlowResult> {
+  const base: OptionsFlowResult = {
+    available: false,
+    ticker,
+    expiration: null,
+    putCallVolumeRatio: null,
+    putCallOpenInterestRatio: null,
+    totalCallVolume: 0,
+    totalPutVolume: 0,
+    totalOpenInterest: 0,
+    unusualActivity: false,
+    unusualNote: null,
+    premiumFlow: null,
+    signal: "neutral",
+    interpretation: "Options data is unavailable for this ticker.",
+  };
+
+  try {
+    const { spot, options } = await fetchChain(ticker);
+    if (options.length === 0) return base;
+
+    // Use the nearest expiration for the headline flow summary
+    const nearest = [...options].sort(
+      (a, b) => a.expirationDate.getTime() - b.expirationDate.getTime()
+    )[0];
+
+    let callVol = 0;
+    let putVol = 0;
+    let callOi = 0;
+    let putOi = 0;
+    let callFlow = 0;
+    let putFlow = 0;
+
+    for (const exp of options) {
+      for (const c of exp.calls) {
+        callVol += c.volume ?? 0;
+        callOi += c.openInterest ?? 0;
+        if (spot && c.impliedVolatility != null) {
+          const g = callGreeks({
+            spot,
+            strike: c.strike,
+            timeToExpiryYears: toYears(exp.expirationDate, new Date()),
+            impliedVolatility: c.impliedVolatility,
+            riskFreeRate: RISK_FREE_RATE,
+          });
+          callFlow += g.delta * (c.volume ?? 0) * 100 * spot;
+        }
+      }
+      for (const p of exp.puts) {
+        putVol += p.volume ?? 0;
+        putOi += p.openInterest ?? 0;
+        if (spot && p.impliedVolatility != null) {
+          const g = putGreeks({
+            spot,
+            strike: p.strike,
+            timeToExpiryYears: toYears(exp.expirationDate, new Date()),
+            impliedVolatility: p.impliedVolatility,
+            riskFreeRate: RISK_FREE_RATE,
+          });
+          putFlow += g.delta * (p.volume ?? 0) * 100 * spot;
+        }
+      }
+    }
+
+    const putCallRatio = callVol > 0 ? putVol / callVol : null;
+    const oiRatio = callOi > 0 ? putOi / callOi : null;
+    const totalVolume = callVol + putVol;
+    const premiumFlow = callFlow + putFlow; // putFlow is negative
+    const flowRatio = totalVolume > 0 ? (callFlow + putFlow) / totalVolume : null;
+
+    // Unusual activity heuristic (free feeds don't expose 20-day history,
+    // so we flag based on today's chain shape):
+    //  1. extreme put/call skew
+    //  2. very high volume relative to open interest (fresh positioning)
+    //  3. heavy concentration in a single strike
+    const unusualReasons: string[] = [];
+    if (putCallRatio != null && putCallRatio > 2.5) unusualReasons.push("extreme put/call volume skew");
+    if (putCallRatio != null && putCallRatio < 0.4) unusualReasons.push("extreme call-heavy volume skew");
+    const totalOi = callOi + putOi;
+    if (totalOi > 0 && totalVolume / totalOi > 0.35)
+      unusualReasons.push(`volume is ${(totalVolume / totalOi).toFixed(2)}x open interest`);
+
+    let unusualActivity = unusualReasons.length > 0;
+    let unusualNote: string | null = null;
+    if (unusualActivity) {
+      unusualNote =
+        `Unusual options activity detected: ${unusualReasons.join(", ")}. ` +
+        "This uses today's free chain data (Yahoo doesn't expose 20-day history), so treat it as a heuristic flag.";
+    }
+
+    // Beginner interpretation
+    let signal: "bullish" | "bearish" | "neutral";
+    let interpretation: string;
+    if (putCallRatio != null && putCallRatio > 1.2) {
+      signal = "bearish";
+      interpretation =
+        `Put/call volume ratio is ${putCallRatio.toFixed(2)} (> 1.2) — traders are buying more puts than calls, ` +
+        "a classic hedging / bearish posture. It can also mean institutional hedging rather than outright selling.";
+    } else if (putCallRatio != null && putCallRatio < 0.6) {
+      signal = "bullish";
+      interpretation =
+        `Put/call volume ratio is ${putCallRatio.toFixed(2)} (< 0.6) — call buying dominates, ` +
+        "suggesting traders expect upside. Crowded bullish flow can sometimes mark a short-term top.";
+    } else if (flowRatio != null && flowRatio > 0.02) {
+      signal = "bullish";
+      interpretation =
+        `Put/call volume is balanced (${putCallRatio?.toFixed(2)}), but net delta-dollar flow is positive ` +
+        "(more call premium being paid for upside exposure than put premium for downside protection).";
+    } else if (flowRatio != null && flowRatio < -0.02) {
+      signal = "bearish";
+      interpretation =
+        `Put/call volume is balanced (${putCallRatio?.toFixed(2)}), but net delta-dollar flow is negative ` +
+        "(more put premium being paid for downside protection).";
+    } else {
+      signal = "neutral";
+      interpretation =
+        `Put/call volume ratio is ${putCallRatio != null ? putCallRatio.toFixed(2) : "n/a"} — options activity is ` +
+        "balanced with no dominant directional bias.";
+    }
+
+    return {
+      ...base,
+      available: true,
+      expiration: nearest.expirationDate.toISOString().slice(0, 10),
+      putCallVolumeRatio: putCallRatio,
+      putCallOpenInterestRatio: oiRatio,
+      totalCallVolume: callVol,
+      totalPutVolume: putVol,
+      totalOpenInterest: callOi + putOi,
+      unusualActivity,
+      unusualNote,
+      premiumFlow,
+      signal,
+      interpretation,
+    };
+  } catch (err) {
+    logger.warn({ err, ticker }, "Options flow unavailable");
+    return base;
+  }
+}
+
+// ── Greeks snapshot (gamma / delta / charm) ──────────────────────────────────
+
+export interface GreeksSnapshot {
+  available: boolean;
+  ticker: string;
+  spot: number | null;
+  expiration: string | null;
+  strike: number | null;
+  call: { delta: number; gamma: number; charm: number } | null;
+  put: { delta: number; gamma: number; charm: number } | null;
+  explanation: string;
+  signal: "bullish" | "bearish" | "neutral";
+  signalNote: string;
+}
+
+export async function getGreeksSnapshot(ticker: string): Promise<GreeksSnapshot> {
+  const base: GreeksSnapshot = {
+    available: false,
+    ticker,
+    spot: null,
+    expiration: null,
+    strike: null,
+    call: null,
+    put: null,
+    explanation: "Greeks data is unavailable for this ticker.",
+    signal: "neutral",
+    signalNote: "No options data.",
+  };
+
+  try {
+    const { spot, options } = await fetchChain(ticker);
+    if (options.length === 0 || spot == null) return base;
+
+    const nearest = [...options].sort(
+      (a, b) => a.expirationDate.getTime() - b.expirationDate.getTime()
+    )[0];
+
+    // ATM strike = closest to spot
+    const allStrikes = [
+      ...nearest.calls.map((c) => c.strike),
+      ...nearest.puts.map((p) => p.strike),
+    ];
+    if (allStrikes.length === 0) return base;
+    const strike = allStrikes.reduce((a, b) =>
+      Math.abs(a - spot) < Math.abs(b - spot) ? a : b
+    );
+
+    const expiry = nearest.expirationDate;
+    const T = toYears(expiry, new Date());
+
+    const callContract = nearest.calls.find((c) => c.strike === strike);
+    const putContract = nearest.puts.find((p) => p.strike === strike);
+
+    const call = callContract?.impliedVolatility != null
+      ? callGreeks({
+          spot,
+          strike,
+          timeToExpiryYears: T,
+          impliedVolatility: callContract.impliedVolatility,
+          riskFreeRate: RISK_FREE_RATE,
+        })
+      : null;
+    const put = putContract?.impliedVolatility != null
+      ? putGreeks({
+          spot,
+          strike,
+          timeToExpiryYears: T,
+          impliedVolatility: putContract.impliedVolatility,
+          riskFreeRate: RISK_FREE_RATE,
+        })
+      : null;
+
+    // Signal: combine ATM call vs put delta magnitude and gamma
+    let signal: "bullish" | "bearish" | "neutral";
+    let signalNote: string;
+    if (call && put) {
+      const callPower = call.delta;
+      const putPower = Math.abs(put.delta);
+      if (callPower > putPower + 0.08) {
+        signal = "bullish";
+        signalNote =
+          "ATM calls carry more delta than ATM puts — the market's short-term option positioning leans bullish.";
+      } else if (putPower > callPower + 0.08) {
+        signal = "bearish";
+        signalNote =
+          "ATM puts carry more delta than ATM calls — the market's short-term option positioning leans bearish (more downside hedging).";
+      } else {
+        signal = "neutral";
+        signalNote = "ATM call and put deltas are roughly balanced — no strong directional tilt in option positioning.";
+      }
+    } else {
+      signal = "neutral";
+      signalNote = "Insufficient data to read option positioning.";
+    }
+
+    const explanation =
+      `Greeks are computed with the Black-Scholes model using the nearest expiration (${expiry.toISOString().slice(0, 10)}) ` +
+      `at the ATM strike $${strike.toFixed(2)}. ` +
+      `Call: delta ${call?.delta.toFixed(2) ?? "n/a"}, gamma ${call?.gamma.toFixed(3) ?? "n/a"}, charm ${call?.charm.toFixed(4) ?? "n/a"}. ` +
+      `Put: delta ${put?.delta.toFixed(2) ?? "n/a"}, gamma ${put?.gamma.toFixed(3) ?? "n/a"}, charm ${put?.charm.toFixed(4) ?? "n/a"}. ` +
+      "Delta ≈ how many shares each contract mimics; gamma ≈ how fast delta changes; charm ≈ how much delta decays per day.";
+
+    return {
+      available: true,
+      ticker,
+      spot,
+      expiration: expiry.toISOString().slice(0, 10),
+      strike,
+      call: call ? { delta: call.delta, gamma: call.gamma, charm: call.charm } : null,
+      put: put ? { delta: put.delta, gamma: put.gamma, charm: put.charm } : null,
+      explanation,
+      signal,
+      signalNote,
+    };
+  } catch (err) {
+    logger.warn({ err, ticker }, "Greeks unavailable");
+    return base;
+  }
+}
+
+// ── GEX / net flow (SPX, VIX, SPY…) ─────────────────────────────────────────
+
+export interface GexPoint {
+  strike: number;
+  callGex: number;
+  putGex: number;
+  netGex: number;
+  callFlow: number;
+  putFlow: number;
+  netFlow: number;
+  openInterest: number;
+}
+
+export interface GexData {
+  available: boolean;
+  symbol: string;
+  spot: number | null;
+  expirations: number;
+  netGex: number;
+  gammaFlip: number | null;
+  callFlowTotal: number;
+  putFlowTotal: number;
+  netFlowTotal: number;
+  points: GexPoint[];
+  signal: "bullish" | "bearish" | "neutral";
+  explanation: string;
+}
+
+/**
+ * Compute per-strike gamma exposure (GEX) and net delta-dollar flow.
+ *
+ * Convention: market makers are assumed short calls (call GEX negative) and
+ * long puts (put GEX positive). Positive net GEX ⇒ dealers are long gamma and
+ * dampen price moves; negative net GEX ⇒ dealers are short gamma and can
+ * amplify them. Net flow = Σ(delta × volume × 100 × spot) per side.
+ */
+export async function getGexData(symbol: string, maxExpirations = 8): Promise<GexData> {
+  const base: GexData = {
+    available: false,
+    symbol,
+    spot: null,
+    expirations: 0,
+    netGex: 0,
+    gammaFlip: null,
+    callFlowTotal: 0,
+    putFlowTotal: 0,
+    netFlowTotal: 0,
+    points: [],
+    signal: "neutral",
+    explanation: "GEX data is unavailable for this symbol.",
+  };
+
+  try {
+    const { spot, options } = await fetchChain(symbol);
+    if (options.length === 0 || spot == null) return base;
+
+    const now = new Date();
+    const recent = [...options]
+      .sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime())
+      .slice(0, maxExpirations);
+
+    // Per-strike aggregation across the selected expirations
+    const strikeMap = new Map<number, GexPoint>();
+
+    for (const exp of recent) {
+      const T = toYears(exp.expirationDate, now);
+      for (const c of exp.calls) {
+        if (c.strike <= 0 || c.impliedVolatility == null) continue;
+        const g = callGreeks({
+          spot,
+          strike: c.strike,
+          timeToExpiryYears: T,
+          impliedVolatility: c.impliedVolatility,
+          riskFreeRate: RISK_FREE_RATE,
+        });
+        const oi = c.openInterest ?? 0;
+        const vol = c.volume ?? 0;
+        const point = strikeMap.get(c.strike) ?? {
+          strike: c.strike,
+          callGex: 0,
+          putGex: 0,
+          netGex: 0,
+          callFlow: 0,
+          putFlow: 0,
+          netFlow: 0,
+          openInterest: 0,
+        };
+        point.callGex += -(g.gamma * oi * 100 * spot);
+        point.callFlow += g.delta * vol * 100 * spot;
+        point.openInterest += oi;
+        strikeMap.set(c.strike, point);
+      }
+      for (const p of exp.puts) {
+        if (p.strike <= 0 || p.impliedVolatility == null) continue;
+        const g = putGreeks({
+          spot,
+          strike: p.strike,
+          timeToExpiryYears: T,
+          impliedVolatility: p.impliedVolatility,
+          riskFreeRate: RISK_FREE_RATE,
+        });
+        const oi = p.openInterest ?? 0;
+        const vol = p.volume ?? 0;
+        const point = strikeMap.get(p.strike) ?? {
+          strike: p.strike,
+          callGex: 0,
+          putGex: 0,
+          netGex: 0,
+          callFlow: 0,
+          putFlow: 0,
+          netFlow: 0,
+          openInterest: 0,
+        };
+        point.putGex += g.gamma * oi * 100 * spot;
+        point.putFlow += g.delta * vol * 100 * spot;
+        point.openInterest += oi;
+        strikeMap.set(p.strike, point);
+      }
+    }
+
+    const points = [...strikeMap.values()]
+      .map((p) => ({
+        ...p,
+        netGex: p.callGex + p.putGex,
+        netFlow: p.callFlow + p.putFlow,
+      }))
+      .sort((a, b) => a.strike - b.strike);
+
+    const netGex = points.reduce((a, b) => a + b.netGex, 0);
+    const callFlowTotal = points.reduce((a, b) => a + b.callFlow, 0);
+    const putFlowTotal = points.reduce((a, b) => a + b.putFlow, 0);
+    const netFlowTotal = callFlowTotal + putFlowTotal;
+
+    // Gamma flip: strike where cumulative net GEX crosses zero
+    let cumulative = 0;
+    let gammaFlip: number | null = null;
+    let prev = 0;
+    for (const p of points) {
+      cumulative += p.netGex;
+      if ((prev < 0 && cumulative >= 0) || (prev > 0 && cumulative <= 0)) {
+        gammaFlip = p.strike;
+        break;
+      }
+      prev = cumulative;
+    }
+
+    let signal: "bullish" | "bearish" | "neutral";
+    let explanation: string;
+    if (netGex < 0) {
+      signal = "bearish";
+      explanation =
+        `Dealer net gamma is negative ($${(netGex / 1e6).toFixed(0)}M) — market makers are short gamma and may ` +
+        "amplify sharp moves in either direction. Expect elevated volatility. Net delta-dollar flow is " +
+        `${netFlowTotal >= 0 ? "positive (call buying dominant)" : "negative (put buying dominant)"}.`;
+    } else if (netGex > 0) {
+      signal = "neutral";
+      explanation =
+        `Dealer net gamma is positive ($${(netGex / 1e6).toFixed(0)}M) — market makers are long gamma and tend to ` +
+        "dampen sharp moves (pinning near high-gamma strikes). Net delta-dollar flow is " +
+        `${netFlowTotal >= 0 ? "positive (call buying dominant)" : "negative (put buying dominant)"}.`;
+    } else {
+      signal = "neutral";
+      explanation = "Net dealer gamma is near zero — no strong positioning tilt.";
+    }
+
+    // Keep chart manageable: strikes within ±12% of spot
+    const lo = spot * 0.88;
+    const hi = spot * 1.12;
+    const chartPoints = points.filter((p) => p.strike >= lo && p.strike <= hi);
+
+    return {
+      available: true,
+      symbol,
+      spot,
+      expirations: recent.length,
+      netGex,
+      gammaFlip,
+      callFlowTotal,
+      putFlowTotal,
+      netFlowTotal,
+      points: chartPoints,
+      signal,
+      explanation,
+    };
+  } catch (err) {
+    logger.warn({ err, symbol }, "GEX data unavailable");
+    return base;
+  }
+}

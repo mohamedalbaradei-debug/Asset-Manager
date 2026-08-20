@@ -1,0 +1,1574 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.2.0
+  description: AI Investment Assistant API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: analysis
+    description: Stock analysis operations
+  - name: market
+    description: Market-wide data operations
+  - name: panels
+    description: Market intelligence panels
+  - name: watchlist
+    description: Watchlist management
+  - name: ai
+    description: AI analyst endpoints
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /analyze:
+    post:
+      operationId: analyzeStock
+      tags: [analysis]
+      summary: Analyze a stock ticker
+      description: Returns full technical, fundamental, sentiment, options, macro, and AI analysis for a given ticker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisInput"
+      responses:
+        "200":
+          description: Full analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Ticker not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /macro:
+    get:
+      operationId: getMacroData
+      tags: [market]
+      summary: Get macro and market breadth data
+      description: Returns latest macroeconomic indicators and market breadth/liquidity metrics
+      responses:
+        "200":
+          description: Macro and breadth data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MacroMarketData"
+
+  /trending:
+    get:
+      operationId: getTrendingTickers
+      tags: [market]
+      summary: Get trending/popular tickers
+      description: Returns a quick snapshot of popular market tickers
+      responses:
+        "200":
+          description: List of trending tickers with basic stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendingTicker"
+
+  /movers:
+    get:
+      operationId: getMarketMovers
+      tags: [panels]
+      summary: Today's market movers
+      responses:
+        "200":
+          description: Top gainers, losers, and most active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoversData"
+
+  /sectors:
+    get:
+      operationId: getSectorRotation
+      tags: [panels]
+      summary: GICS sector rotation via SPDR ETFs
+      responses:
+        "200":
+          description: Sector performance vs SPY
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SectorRotationData"
+
+  /spyqqq:
+    get:
+      operationId: getSpyQqqRotation
+      tags: [panels]
+      summary: SPY vs QQQ rotation chart
+      responses:
+        "200":
+          description: Normalized SPY/QQQ series and ratio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpyQqqRotation"
+
+  /gex:
+    get:
+      operationId: getGexData
+      tags: [panels]
+      summary: SPX and VIX gamma exposure + net flow
+      responses:
+        "200":
+          description: GEX and net delta-dollar flow for SPX and VIX
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GexResponse"
+
+  /macro/full:
+    get:
+      operationId: getFullUsMacro
+      tags: [panels]
+      summary: Full US macro snapshot
+      responses:
+        "200":
+          description: Extended US macro indicators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullUsMacro"
+
+  /macro/global:
+    get:
+      operationId: getGlobalMacro
+      tags: [panels]
+      summary: Global macro cross-country table
+      responses:
+        "200":
+          description: Cross-country CPI and short rates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlobalMacro"
+
+  /fed:
+    get:
+      operationId: getFedData
+      tags: [panels]
+      summary: Fed balance sheet, primary dealers, FOMC docs
+      responses:
+        "200":
+          description: Fed dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FedData"
+
+  /fx:
+    get:
+      operationId: getFxData
+      tags: [panels]
+      summary: Major FX pairs with rate differentials
+      responses:
+        "200":
+          description: FX spot and carry data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxData"
+
+  /valuation:
+    get:
+      operationId: getValuationData
+      tags: [panels]
+      summary: S&P 500 valuation metrics
+      responses:
+        "200":
+          description: PE, CAPE, earnings yield, dividend yield
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValuationData"
+
+  /shipping:
+    get:
+      operationId: getShippingData
+      tags: [panels]
+      summary: Shipping chokepoint transit data
+      responses:
+        "200":
+          description: IMF PortWatch transit volumes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingData"
+
+  /news:
+    get:
+      operationId: getLatestNews
+      tags: [panels]
+      summary: Latest market headlines
+      responses:
+        "200":
+          description: Aggregated news with sentiment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsData"
+
+  /marketpulse:
+    get:
+      operationId: getMarketPulse
+      tags: [panels]
+      summary: Combined market pulse board
+      responses:
+        "200":
+          description: Macro highlights, movers, sector rotation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketPulse"
+
+  /watchlist:
+    get:
+      operationId: getWatchlist
+      tags: [watchlist]
+      summary: List saved tickers
+      responses:
+        "200":
+          description: Watchlist tickers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistResponse"
+    post:
+      operationId: addToWatchlist
+      tags: [watchlist]
+      summary: Add a ticker to the watchlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchlistAddInput"
+      responses:
+        "200":
+          description: Updated list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistAddResponse"
+
+  /watchlist/{ticker}:
+    delete:
+      operationId: removeFromWatchlist
+      tags: [watchlist]
+      summary: Remove a ticker from the watchlist
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistRemoveResponse"
+
+  /watchlist/summary:
+    get:
+      operationId: getWatchlistSummary
+      tags: [watchlist]
+      summary: Price, daily change, RSI for watched tickers
+      responses:
+        "200":
+          description: Watchlist summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistSummary"
+
+  /calendar:
+    get:
+      operationId: getCalendar
+      tags: [watchlist]
+      summary: Earnings, dividends, IPO calendar
+      responses:
+        "200":
+          description: Calendar data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarData"
+
+  /performance:
+    get:
+      operationId: getPerformance
+      tags: [watchlist]
+      summary: Recommendation performance log summary
+      responses:
+        "200":
+          description: Win rate summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceData"
+
+  /ai/status:
+    get:
+      operationId: getAiStatus
+      tags: [ai]
+      summary: AI free quota status
+      responses:
+        "200":
+          description: Free quota
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiStatus"
+
+  /ai/chat:
+    post:
+      operationId: aiChat
+      tags: [ai]
+      summary: Chat with the AI analyst
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatRequest"
+      responses:
+        "200":
+          description: Assistant reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatReply"
+        "502":
+          description: Provider error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatReply"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    AnalysisInput:
+      type: object
+      properties:
+        ticker:
+          type: string
+          description: Stock ticker symbol (e.g. AAPL, TSLA)
+          minLength: 1
+          maxLength: 10
+      required:
+        - ticker
+
+    HistoricalDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        price:
+          type: number
+        priceNorm:
+          type: number
+          description: Normalized price (rebased to 100 at period start)
+        spyPriceNorm:
+          type: ["number", "null"]
+          description: Normalized SPY price for comparison
+      required:
+        - date
+        - price
+        - priceNorm
+
+    MacdValues:
+      type: object
+      properties:
+        macd:
+          type: number
+        signal:
+          type: number
+        histogram:
+          type: number
+      required:
+        - macd
+        - signal
+        - histogram
+
+    TechnicalExplanations:
+      type: object
+      properties:
+        rsi:
+          type: string
+        macd:
+          type: string
+        sma50:
+          type: string
+        sma200:
+          type: string
+      required:
+        - rsi
+        - macd
+        - sma50
+        - sma200
+
+    RecommendationDetail:
+      type: object
+      description: A recommendation for either a trader (short-term technical) or investor (long-term fundamental)
+      properties:
+        recommendation:
+          type: string
+          description: "One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL"
+        score:
+          type: number
+          description: Composite score driving recommendation
+        rationale:
+          type: array
+          items:
+            type: string
+          description: Specific sentences explaining why this recommendation was reached
+      required:
+        - recommendation
+        - score
+        - rationale
+
+    SentimentHeadline:
+      type: object
+      properties:
+        title:
+          type: string
+        score:
+          type: number
+        label:
+          type: string
+      required:
+        - title
+        - score
+        - label
+
+    SentimentReport:
+      type: object
+      properties:
+        available:
+          type: boolean
+        compound:
+          type: number
+        label:
+          type: string
+          description: "One of: Bullish, Neutral, Bearish"
+        explanation:
+          type: string
+        headlines:
+          type: array
+          items:
+            $ref: "#/components/schemas/SentimentHeadline"
+        source:
+          type: string
+      required:
+        - available
+        - compound
+        - label
+        - explanation
+        - headlines
+        - source
+
+    OptionsFlowResult:
+      type: object
+      properties:
+        available:
+          type: boolean
+        ticker:
+          type: string
+        expiration:
+          type: ["string", "null"]
+        putCallVolumeRatio:
+          type: ["number", "null"]
+        putCallOpenInterestRatio:
+          type: ["number", "null"]
+        totalCallVolume:
+          type: number
+        totalPutVolume:
+          type: number
+        totalOpenInterest:
+          type: number
+        unusualActivity:
+          type: boolean
+        unusualNote:
+          type: ["string", "null"]
+        premiumFlow:
+          type: ["number", "null"]
+        signal:
+          type: string
+          description: "One of: bullish, bearish, neutral"
+        interpretation:
+          type: string
+      required:
+        - available
+        - ticker
+        - signal
+        - interpretation
+
+    GreeksSnapshot:
+      type: object
+      properties:
+        available:
+          type: boolean
+        ticker:
+          type: string
+        spot:
+          type: ["number", "null"]
+        expiration:
+          type: ["string", "null"]
+        strike:
+          type: ["number", "null"]
+        call:
+          type: ["object", "null"]
+          properties:
+            delta:
+              type: number
+            gamma:
+              type: number
+            charm:
+              type: number
+        put:
+          type: ["object", "null"]
+          properties:
+            delta:
+              type: number
+            gamma:
+              type: number
+            charm:
+              type: number
+        explanation:
+          type: string
+        signal:
+          type: string
+        signalNote:
+          type: string
+      required:
+        - available
+        - ticker
+        - explanation
+        - signal
+        - signalNote
+
+    MarketInternals:
+      type: object
+      properties:
+        trin:
+          type: ["number", "null"]
+        trinSignal:
+          type: string
+        trinExplanation:
+          type: string
+        tnxYield:
+          type: ["number", "null"]
+        liquidityAssessment:
+          type: string
+          description: "One of: ample, moderate, tight, unknown"
+        liquidityExplanation:
+          type: string
+      required:
+        - trinSignal
+        - trinExplanation
+        - liquidityAssessment
+        - liquidityExplanation
+
+    FairValue:
+      type: object
+      properties:
+        targetMeanPrice:
+          type: ["number", "null"]
+        percentDifference:
+          type: ["number", "null"]
+        label:
+          type: string
+          description: "One of: Undervalued, Overvalued, Fairly valued"
+        explanation:
+          type: string
+      required:
+        - label
+        - explanation
+
+    PriceVsEps:
+      type: object
+      properties:
+        dates:
+          type: array
+          items:
+            type: string
+        eps:
+          type: array
+          items:
+            type: number
+        price:
+          type: array
+          items:
+            type: number
+
+    AiReport:
+      type: object
+      properties:
+        available:
+          type: boolean
+        content:
+          type: ["string", "null"]
+        model:
+          type: ["string", "null"]
+        provider:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+
+    AnalysisResult:
+      type: object
+      properties:
+        ticker:
+          type: string
+        companyName:
+          type: ["string", "null"]
+        currentPrice:
+          type: number
+        priceChange:
+          type: ["number", "null"]
+          description: Price change today in dollars
+        priceChangePct:
+          type: ["number", "null"]
+          description: Price change today as percentage
+        rsi:
+          type: number
+        macd:
+          $ref: "#/components/schemas/MacdValues"
+        sma50:
+          type: number
+        sma200:
+          type: number
+        support:
+          type: number
+        resistance:
+          type: number
+        peRatio:
+          type: ["number", "null"]
+        eps:
+          type: ["number", "null"]
+        dividendYield:
+          type: ["number", "null"]
+        marketCap:
+          type: ["number", "null"]
+        volume:
+          type: ["number", "null"]
+        avgVolume:
+          type: ["number", "null"]
+        fiftyTwoWeekHigh:
+          type: ["number", "null"]
+        fiftyTwoWeekLow:
+          type: ["number", "null"]
+        explanations:
+          $ref: "#/components/schemas/TechnicalExplanations"
+        historicalData:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoricalDataPoint"
+        news:
+          type: array
+          items:
+            type: string
+        recommendation:
+          type: string
+          description: "Combined recommendation. One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL"
+        score:
+          type: number
+          description: Combined composite score
+        traderRec:
+          $ref: "#/components/schemas/RecommendationDetail"
+          description: Short-term recommendation based on technical signals (RSI, MACD, momentum, support/resistance)
+        investorRec:
+          $ref: "#/components/schemas/RecommendationDetail"
+          description: Long-term recommendation based on fundamental and trend signals (P/E, SMA200, 52-week range, dividend)
+        fairValue:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/FairValue"
+        priceVsEps:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/PriceVsEps"
+        newsSentiment:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/SentimentReport"
+        socialSentiment:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/SentimentReport"
+        marketInternals:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/MarketInternals"
+        optionsFlow:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/OptionsFlowResult"
+        greeks:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/GreeksSnapshot"
+        macroContext:
+          type: array
+          items:
+            $ref: "#/components/schemas/MacroDataEntry"
+        aiReport:
+          $ref: "#/components/schemas/AiReport"
+        disclaimer:
+          type: string
+        performedAt:
+          type: string
+      required:
+        - ticker
+        - currentPrice
+        - rsi
+        - macd
+        - sma50
+        - sma200
+        - support
+        - resistance
+        - explanations
+        - historicalData
+        - news
+        - recommendation
+        - score
+        - traderRec
+        - investorRec
+        - macroContext
+        - aiReport
+        - disclaimer
+        - performedAt
+
+    MacroDataEntry:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        status:
+          type: ["string", "null"]
+          description: "One of: bullish, neutral, bearish"
+      required:
+        - label
+        - value
+
+    BreadthDataEntry:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        status:
+          type: ["string", "null"]
+          description: "One of: bullish, neutral, bearish"
+      required:
+        - label
+        - value
+
+    FearGreedData:
+      type: object
+      description: Composite Fear & Greed index derived from VIX, market breadth, and yield curve
+      properties:
+        score:
+          type: number
+          description: 0 (Extreme Fear) to 100 (Extreme Greed)
+        label:
+          type: string
+          description: "One of: Extreme Fear, Fear, Neutral, Greed, Extreme Greed"
+        description:
+          type: string
+          description: Plain-language interpretation of the current reading
+        status:
+          type: string
+          description: "Contrarian equity signal — one of: bullish, neutral, bearish"
+      required:
+        - score
+        - label
+        - description
+        - status
+
+    CommodityEntry:
+      type: object
+      description: Price and equity-impact data for a commodity or crypto asset
+      properties:
+        symbol:
+          type: string
+        label:
+          type: string
+        price:
+          type: number
+        change:
+          type: number
+        changePct:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          description: "Effect on equities — one of: bullish, neutral, bearish"
+        equityImpact:
+          type: string
+          description: Plain-language explanation of how today's move affects equity markets
+      required:
+        - symbol
+        - label
+        - price
+        - change
+        - changePct
+        - currency
+        - status
+        - equityImpact
+
+    MacroMarketData:
+      type: object
+      properties:
+        macro:
+          type: array
+          items:
+            $ref: "#/components/schemas/MacroDataEntry"
+        breadth:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreadthDataEntry"
+        fearGreed:
+          $ref: "#/components/schemas/FearGreedData"
+        commodities:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommodityEntry"
+        updatedAt:
+          type: string
+      required:
+        - macro
+        - breadth
+        - fearGreed
+        - commodities
+        - updatedAt
+
+    TrendingTicker:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: ["string", "null"]
+        price:
+          type: number
+        change:
+          type: number
+        changePct:
+          type: number
+        marketCap:
+          type: ["number", "null"]
+      required:
+        - symbol
+        - price
+        - change
+        - changePct
+
+    Mover:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: ["string", "null"]
+        price:
+          type: number
+        changePct:
+          type: number
+        change:
+          type: number
+        volume:
+          type: ["number", "null"]
+        marketCap:
+          type: ["number", "null"]
+      required:
+        - symbol
+        - price
+        - changePct
+        - change
+
+    MoversData:
+      type: object
+      properties:
+        gainers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mover"
+        losers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mover"
+        mostActive:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mover"
+        updatedAt:
+          type: string
+      required:
+        - gainers
+        - losers
+        - mostActive
+        - updatedAt
+
+    SectorRotationItem:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        change1dPct:
+          type: ["number", "null"]
+        change1wPct:
+          type: ["number", "null"]
+        change1mPct:
+          type: ["number", "null"]
+        relStrengthSpy:
+          type: ["number", "null"]
+      required:
+        - symbol
+        - name
+
+    SectorRotationData:
+      type: object
+      properties:
+        sectors:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectorRotationItem"
+        spy:
+          type: object
+          properties:
+            change1dPct:
+              type: ["number", "null"]
+            change1wPct:
+              type: ["number", "null"]
+        updatedAt:
+          type: string
+      required:
+        - sectors
+        - spy
+        - updatedAt
+
+    SpyQqqPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        spy:
+          type: ["number", "null"]
+        qqq:
+          type: ["number", "null"]
+        ratio:
+          type: ["number", "null"]
+
+    SpyQqqRotation:
+      type: object
+      properties:
+        available:
+          type: boolean
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpyQqqPoint"
+        spy1m:
+          type: ["number", "null"]
+        qqq1m:
+          type: ["number", "null"]
+        spy3m:
+          type: ["number", "null"]
+        qqq3m:
+          type: ["number", "null"]
+        signal:
+          type: string
+        explanation:
+          type: string
+      required:
+        - available
+        - points
+        - signal
+        - explanation
+
+    GexPoint:
+      type: object
+      properties:
+        strike:
+          type: number
+        callGex:
+          type: number
+        putGex:
+          type: number
+        netGex:
+          type: number
+        callFlow:
+          type: number
+        putFlow:
+          type: number
+        netFlow:
+          type: number
+        openInterest:
+          type: number
+
+    GexData:
+      type: object
+      properties:
+        available:
+          type: boolean
+        symbol:
+          type: string
+        spot:
+          type: ["number", "null"]
+        expirations:
+          type: number
+        netGex:
+          type: number
+        gammaFlip:
+          type: ["number", "null"]
+        callFlowTotal:
+          type: number
+        putFlowTotal:
+          type: number
+        netFlowTotal:
+          type: number
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/GexPoint"
+        signal:
+          type: string
+        explanation:
+          type: string
+      required:
+        - available
+        - symbol
+        - points
+        - signal
+        - explanation
+
+    GexResponse:
+      type: object
+      properties:
+        spx:
+          $ref: "#/components/schemas/GexData"
+        vix:
+          $ref: "#/components/schemas/GexData"
+        updatedAt:
+          type: string
+      required:
+        - spx
+        - vix
+        - updatedAt
+
+    FullUsMacro:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MacroDataEntry"
+        updatedAt:
+          type: string
+      required:
+        - items
+        - updatedAt
+
+    GlobalMacroRow:
+      type: object
+      properties:
+        country:
+          type: string
+        code:
+          type: string
+        cpiYoY:
+          type: ["number", "null"]
+        shortRate:
+          type: ["number", "null"]
+        cli:
+          type: ["number", "null"]
+      required:
+        - country
+        - code
+
+    GlobalMacro:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/GlobalMacroRow"
+        updatedAt:
+          type: string
+        note:
+          type: ["string", "null"]
+      required:
+        - rows
+        - updatedAt
+
+    FedData:
+      type: object
+      properties:
+        balanceSheet:
+          type: array
+          items:
+            $ref: "#/components/schemas/MacroDataEntry"
+        primaryDealerTreasuries:
+          type: object
+          properties:
+            value:
+              type: ["number", "null"]
+            note:
+              type: string
+        fomc:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              link:
+                type: string
+        updatedAt:
+          type: string
+      required:
+        - balanceSheet
+        - primaryDealerTreasuries
+        - fomc
+        - updatedAt
+
+    FxRow:
+      type: object
+      properties:
+        pair:
+          type: string
+        spot:
+          type: ["number", "null"]
+        rateDifferentialPct:
+          type: ["number", "null"]
+        interpretation:
+          type: string
+      required:
+        - pair
+        - interpretation
+
+    FxData:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxRow"
+        updatedAt:
+          type: string
+      required:
+        - rows
+        - updatedAt
+
+    ValuationData:
+      type: object
+      properties:
+        pe:
+          type: ["number", "null"]
+        cape:
+          type: ["number", "null"]
+        earningsYield:
+          type: ["number", "null"]
+        dividendYield:
+          type: ["number", "null"]
+        source:
+          type: string
+        note:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+      required:
+        - source
+        - updatedAt
+
+    ShippingRow:
+      type: object
+      properties:
+        chokepoint:
+          type: string
+        volumeTonnes:
+          type: ["number", "null"]
+        vessels:
+          type: ["number", "null"]
+        status:
+          type: string
+        note:
+          type: string
+      required:
+        - chokepoint
+        - status
+        - note
+
+    ShippingData:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShippingRow"
+        updatedAt:
+          type: string
+        available:
+          type: boolean
+      required:
+        - rows
+        - updatedAt
+        - available
+
+    NewsItem:
+      type: object
+      properties:
+        title:
+          type: string
+        link:
+          type: ["string", "null"]
+        source:
+          type: string
+        publishedAt:
+          type: ["string", "null"]
+        summary:
+          type: ["string", "null"]
+        sentimentLabel:
+          type: string
+      required:
+        - title
+        - source
+        - sentimentLabel
+
+    NewsData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NewsItem"
+        updatedAt:
+          type: string
+      required:
+        - items
+        - updatedAt
+
+    MarketPulse:
+      type: object
+      properties:
+        macro:
+          type: array
+          items:
+            $ref: "#/components/schemas/MacroDataEntry"
+        internals:
+          type: object
+          properties:
+            trin:
+              type: ["number", "null"]
+            trinSignal:
+              type: string
+            tnxYield:
+              type: ["number", "null"]
+            liquidityAssessment:
+              type: string
+        topGainers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mover"
+        topLosers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mover"
+        sectorRotation:
+          type: object
+          properties:
+            best:
+              type: ["object", "null"]
+              $ref: "#/components/schemas/SectorRotationItem"
+            worst:
+              type: ["object", "null"]
+              $ref: "#/components/schemas/SectorRotationItem"
+            spy1d:
+              type: ["number", "null"]
+        updatedAt:
+          type: string
+      required:
+        - macro
+        - internals
+        - topGainers
+        - topLosers
+        - sectorRotation
+        - updatedAt
+
+    WatchlistResponse:
+      type: object
+      properties:
+        watchlist:
+          type: array
+          items:
+            type: string
+      required:
+        - watchlist
+
+    WatchlistAddInput:
+      type: object
+      properties:
+        ticker:
+          type: string
+      required:
+        - ticker
+
+    WatchlistAddResponse:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            type: string
+        added:
+          type: boolean
+      required:
+        - list
+        - added
+
+    WatchlistRemoveResponse:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            type: string
+        removed:
+          type: boolean
+      required:
+        - list
+        - removed
+
+    WatchlistSummaryItem:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: ["string", "null"]
+        price:
+          type: ["number", "null"]
+        changePct:
+          type: ["number", "null"]
+        rsi:
+          type: ["number", "null"]
+      required:
+        - symbol
+
+    WatchlistSummary:
+      type: object
+      properties:
+        watchlist:
+          type: array
+          items:
+            type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchlistSummaryItem"
+        updatedAt:
+          type: string
+      required:
+        - watchlist
+        - items
+        - updatedAt
+
+    CalendarEarningsRow:
+      type: object
+      properties:
+        ticker:
+          type: string
+        date:
+          type: ["string", "null"]
+        epsEstimate:
+          type: ["number", "null"]
+        epsActual:
+          type: ["number", "null"]
+        label:
+          type: string
+      required:
+        - ticker
+        - label
+
+    CalendarDividendRow:
+      type: object
+      properties:
+        ticker:
+          type: string
+        amount:
+          type: ["number", "null"]
+        exDate:
+          type: ["string", "null"]
+        payDate:
+          type: ["string", "null"]
+        frequency:
+          type: ["string", "null"]
+      required:
+        - ticker
+
+    CalendarData:
+      type: object
+      properties:
+        earnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarEarningsRow"
+        dividends:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarDividendRow"
+        ipos:
+          type: array
+          items:
+            type: object
+            properties:
+              company:
+                type: string
+              date:
+                type: ["string", "null"]
+              exchange:
+                type: ["string", "null"]
+              status:
+                type: string
+        ipoNote:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - earnings
+        - dividends
+        - ipos
+        - ipoNote
+        - updatedAt
+
+    PerformanceData:
+      type: object
+      properties:
+        total:
+          type: number
+        wins:
+          type: number
+        losses:
+          type: number
+        winRate:
+          type: ["number", "null"]
+        note:
+          type: string
+      required:
+        - total
+        - wins
+        - losses
+        - note
+
+    AiStatus:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        remaining:
+          type: number
+        limit:
+          type: number
+        updatedAt:
+          type: string
+      required:
+        - configured
+        - remaining
+        - limit
+        - updatedAt
+
+    AiChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant]
+        content:
+          type: string
+      required:
+        - role
+        - content
+
+    AiChatRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: [openai, anthropic, groq, deepseek, custom, free]
+        apiKey:
+          type: string
+        model:
+          type: string
+        baseUrl:
+          type: string
+        systemPrompt:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiChatMessage"
+      required:
+        - provider
+        - messages
+
+    AiChatReply:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        content:
+          type: string
+        error:
+          type: string
+      required:
+        - ok

@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "AI Investment Assistant"
+version = "1.0.0"
+id = "artifacts/investment-app"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23659
+
+[services.development]
+run = "pnpm --filter @workspace/investment-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/investment-app", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/investment-app/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23659"
+BASE_PATH = "/"
