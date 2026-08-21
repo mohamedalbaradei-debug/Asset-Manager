@@ -34,8 +34,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", router);
 
 // Serve the built frontend when present (single-service deployment, e.g. Render).
-const webDist =
-  process.env.WEB_DIST ?? path.resolve(process.cwd(), "artifacts/investment-app/dist");
+const webDist = path.resolve(
+  process.env.WEB_DIST ?? path.resolve(process.cwd(), "artifacts/investment-app/dist"),
+);
 
 if (existsSync(webDist)) {
   app.use(express.static(webDist));
