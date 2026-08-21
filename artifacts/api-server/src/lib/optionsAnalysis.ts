@@ -45,12 +45,20 @@ async function fetchChain(ticker: string) {
 
 // CBOE delayed quotes (free, keyless) — fallback when Yahoo blocks the chain.
 // Symbols look like SPXW260917C07000000 → root + YYMMDD + C/P + strike×1000.
-async function fetchChainCboe(ticker: string) {
+async function fetchChainCboe(tickerRaw: string) {
   try {
+    const ticker = tickerRaw.replace(/^\^/, "").toUpperCase();
     // Index options use an underscore prefix on CBOE (_SPX, _VIX); equities don't.
-    const isIndex = ["SPX", "VIX", "NDX", "RUT", "XSP"].includes(ticker.toUpperCase());
-    const url = `https://cdn.cboe.com/api/global/delayed_quotes/options/${isIndex ? "_" : ""}${ticker.toUpperCase()}.json`;
-    const res = await fetch(url);
+    const isIndex = ["SPX", "VIX", "NDX", "RUT", "XSP"].includes(ticker);
+    const url = `https://cdn.cboe.com/api/global/delayed_quotes/options/${isIndex ? "_" : ""}${ticker}.json`;
+    const res = await fetch(url, {
+      headers: {
+        // CDN sometimes rejects non-browser clients.
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
     if (!res.ok) {
       logger.warn({ status: res.status, ticker }, "CBOE chain request failed");
       return null;

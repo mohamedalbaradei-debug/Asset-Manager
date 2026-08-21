@@ -181,9 +181,10 @@ export async function getFedData(): Promise<FedData> {
 
   const balanceSheet: DataPoint[] = bsResults.map((r) => {
     if (r.status === "fulfilled" && r.value.v != null) {
+      // WALCL/TREAST/WSHOMCB are reported in millions of dollars.
       return {
         label: r.value.label,
-        value: `$${(r.value.v / 1e6).toFixed(2)}B`,
+        value: `$${(r.value.v / 1e6).toFixed(2)}T`,
         status: null,
       };
     }
