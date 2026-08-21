@@ -260,6 +260,24 @@ const FX_PAIRS = [
 ];
 
 async function fxSpot(symbol: string): Promise<number | null> {
+  // Primary: frankfurter.dev (free ECB reference rates, no API key, works
+  // from datacenter IPs). Fallback: Yahoo quoteSummary.
+  try {
+    const m = symbol.match(/^([A-Z]{3})([A-Z]{3})=X$/);
+    if (m) {
+      const base = m[1];
+      let quote = m[2];
+      if (quote === "CNH") quote = "CNY"; // frankfurter lists onshore CNY
+      const res = await fetch(`https://api.frankfurter.dev/v1/latest?base=${base}&symbols=${quote}`);
+      if (res.ok) {
+        const data = (await res.json()) as { rates?: Record<string, number> };
+        const rate = data.rates?.[quote];
+        if (typeof rate === "number" && isFinite(rate)) return rate;
+      }
+    }
+  } catch {
+    // fall through to Yahoo
+  }
   try {
     const q = await yahooFinance.quoteSummary(symbol, { modules: ["price"] });
     const p = q.price?.regularMarketPrice as number | undefined;

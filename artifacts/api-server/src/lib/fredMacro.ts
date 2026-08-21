@@ -12,18 +12,42 @@ interface FredResponse {
 
 export async function fetchFredSeries(seriesId: string, limit = 15): Promise<FredObservation[]> {
   const apiKey = process.env.FRED_API_KEY;
-  if (!apiKey) {
-    logger.warn({ seriesId }, "FRED_API_KEY not set, skipping FRED fetch");
+  if (apiKey) {
+    const url = `${FRED_BASE}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=${limit}`;
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = (await res.json()) as FredResponse;
+        return data.observations.filter((o) => o.value !== ".");
+      }
+      logger.warn({ seriesId, status: res.status }, "FRED API request failed, falling back to CSV");
+    } catch (err) {
+      logger.warn({ seriesId, err }, "FRED API request threw, falling back to CSV");
+    }
+  }
+
+  // Keyless fallback: FRED's public graph CSV (no API key required).
+  try {
+    const res = await fetch(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${seriesId}`);
+    if (!res.ok) {
+      logger.warn({ seriesId, status: res.status }, "FRED CSV fallback failed");
+      return [];
+    }
+    const csv = await res.text();
+    const rows = csv
+      .trim()
+      .split("\n")
+      .slice(1)
+      .map((line) => {
+        const [date, value] = line.split(",");
+        return { date: date ?? "", value: value ?? "" };
+      })
+      .filter((o) => o.date && o.value && o.value !== ".");
+    return rows.slice(-limit).reverse();
+  } catch (err) {
+    logger.warn({ seriesId, err }, "FRED CSV fallback threw");
     return [];
   }
-  const url = `${FRED_BASE}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=${limit}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    logger.warn({ seriesId, status: res.status }, "FRED API request failed");
-    return [];
-  }
-  const data = (await res.json()) as FredResponse;
-  return data.observations.filter((o) => o.value !== ".");
 }
 
 export function latestValue(obs: FredObservation[]): number | null {

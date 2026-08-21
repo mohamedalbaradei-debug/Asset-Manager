@@ -27,6 +27,59 @@ export interface MoversData {
 
 const SCREENER_IDS = ["day_gainers", "day_losers", "most_actives"] as const;
 
+// TradingView scanner fallback — Yahoo's screener API is blocked from
+// datacenter IPs. Sorts the US market by change/volume instead.
+async function fetchScreenerTV(id: (typeof SCREENER_IDS)[number]): Promise<Mover[]> {
+  const sorters = {
+    day_gainers: { left: "change", operation: "desc" },
+    day_losers: { left: "change", operation: "asc" },
+    most_actives: { left: "volume", operation: "desc" },
+  } as const;
+  try {
+    const res = await fetch("https://scanner.tradingview.com/america/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://www.tradingview.com" },
+      body: JSON.stringify({
+        filter: [
+          { left: "type", operation: "equal", right: "stock" },
+          { left: "volume", operation: "greater", right: 100000 },
+          { left: "close", operation: "greater", right: 1 },
+        ],
+        operation: "and",
+        columns: ["name", "description", "close", "change_abs", "change", "volume", "market_cap_basic"],
+        sort: { sortBy: sorters[id].left, sortOrder: sorters[id].operation },
+        range: [0, 10],
+      }),
+    });
+    if (!res.ok) {
+      logger.warn({ status: res.status, id }, "TradingView movers request failed");
+      return [];
+    }
+    const data = (await res.json()) as { data?: Array<{ s: string; d: Array<number | string | null> }> };
+    const num = (v: unknown): number | null => (typeof v === "number" && isFinite(v) ? v : null);
+    return (data.data ?? [])
+      .map((row) => {
+        const [symbol, name, close, changeAbs, changePct, volume, marketCap] = row.d as Array<number | string | null>;
+        const price = num(close);
+        if (!symbol || price == null) return null;
+        return {
+          symbol: String(symbol).split(":").pop() ?? String(symbol),
+          name: name != null ? String(name) : null,
+          price,
+          // TV "change" column is percent; "change_abs" is absolute.
+          changePct: num(changePct) ?? 0,
+          change: num(changeAbs) ?? 0,
+          volume: num(volume),
+          marketCap: num(marketCap),
+        } satisfies Mover;
+      })
+      .filter((m): m is Mover => m != null);
+  } catch (err) {
+    logger.warn({ err, id }, "TradingView movers fetch failed");
+    return [];
+  }
+}
+
 async function fetchScreener(
   id: (typeof SCREENER_IDS)[number]
 ): Promise<Mover[]> {
@@ -42,7 +95,7 @@ async function fetchScreener(
       regularMarketVolume?: number;
       marketCap?: number;
     }>;
-    return quotes
+    const mapped = quotes
       .filter((q) => q.symbol && q.regularMarketPrice != null)
       .map((q) => ({
         symbol: q.symbol as string,
@@ -53,10 +106,11 @@ async function fetchScreener(
         volume: (q.regularMarketVolume ?? null) as number | null,
         marketCap: (q.marketCap ?? null) as number | null,
       }));
+    if (mapped.length > 0) return mapped;
   } catch (err) {
     logger.warn({ err, id }, "Screener fetch failed");
-    return [];
   }
+  return fetchScreenerTV(id);
 }
 
 export async function getMarketMovers(): Promise<MoversData> {

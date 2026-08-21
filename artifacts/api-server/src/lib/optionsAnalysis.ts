@@ -26,14 +26,75 @@ function toYears(expiration: Date, now: Date): number {
 }
 
 async function fetchChain(ticker: string) {
-  const data = await yahooFinance.options(ticker);
-  const spot = (data.quote?.regularMarketPrice as number | undefined) ?? null;
-  const options = (data.options ?? []) as Array<{
-    expirationDate: Date;
-    calls: OptionContract[];
-    puts: OptionContract[];
-  }>;
-  return { data, spot, options };
+  try {
+    const data = await yahooFinance.options(ticker);
+    const spot = (data.quote?.regularMarketPrice as number | undefined) ?? null;
+    const options = (data.options ?? []) as Array<{
+      expirationDate: Date;
+      calls: OptionContract[];
+      puts: OptionContract[];
+    }>;
+    if (options.length > 0) return { data, spot, options };
+  } catch (err) {
+    logger.warn({ err, ticker }, "Yahoo options fetch failed, trying CBOE");
+  }
+  const cboe = await fetchChainCboe(ticker);
+  if (cboe) return cboe;
+  throw new Error(`No options data for ${ticker}`);
+}
+
+// CBOE delayed quotes (free, keyless) — fallback when Yahoo blocks the chain.
+// Symbols look like SPXW260917C07000000 → root + YYMMDD + C/P + strike×1000.
+async function fetchChainCboe(ticker: string) {
+  try {
+    // Index options use an underscore prefix on CBOE (_SPX, _VIX); equities don't.
+    const isIndex = ["SPX", "VIX", "NDX", "RUT", "XSP"].includes(ticker.toUpperCase());
+    const url = `https://cdn.cboe.com/api/global/delayed_quotes/options/${isIndex ? "_" : ""}${ticker.toUpperCase()}.json`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      logger.warn({ status: res.status, ticker }, "CBOE chain request failed");
+      return null;
+    }
+    const json = (await res.json()) as {
+      data?: { current_price?: number; options?: Array<{ option: string; iv: number; volume: number; open_interest: number }> };
+    };
+    const raw = json.data?.options ?? [];
+    const spot = json.data?.current_price ?? null;
+    if (raw.length === 0 || spot == null) return null;
+
+    const byExpiry = new Map<string, { calls: OptionContract[]; puts: OptionContract[] }>();
+    for (const o of raw) {
+      const m = o.option.match(/^[A-Z0-9]+(\d{6})([CP])(\d{8})$/);
+      if (!m) continue;
+      const [, ymd, cp, strikeStr] = m;
+      const expiration = `20${ymd.slice(0, 2)}-${ymd.slice(2, 4)}-${ymd.slice(4, 6)}`;
+      const strike = parseInt(strikeStr, 10) / 1000;
+      if (!isFinite(strike)) continue;
+      let bucket = byExpiry.get(expiration);
+      if (!bucket) {
+        bucket = { calls: [], puts: [] };
+        byExpiry.set(expiration, bucket);
+      }
+      const contract = {
+        strike,
+        volume: o.volume ?? 0,
+        openInterest: o.open_interest ?? 0,
+        impliedVolatility: o.iv ?? 0,
+        inTheMoney: cp === "C" ? spot > strike : spot < strike,
+      };
+      if (cp === "C") bucket.calls.push(contract);
+      else bucket.puts.push(contract);
+    }
+
+    const options = [...byExpiry.entries()]
+      .map(([expiration, { calls, puts }]) => ({ expirationDate: new Date(`${expiration}T20:00:00Z`), calls, puts }))
+      .sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime());
+    if (options.length === 0) return null;
+    return { data: { quote: { regularMarketPrice: spot }, options }, spot, options };
+  } catch (err) {
+    logger.warn({ err, ticker }, "CBOE chain fetch failed");
+    return null;
+  }
 }
 
 // ── Options flow (put/call ratio + unusual activity) ─────────────────────────

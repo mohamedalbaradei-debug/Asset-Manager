@@ -5,6 +5,7 @@ import { getGoogleNewsSentiment, getRedditSentiment } from "./newsSentiment";
 import { analyzeOptionsFlow, getGreeksSnapshot } from "./optionsAnalysis";
 import { getMarketInternals } from "./marketInternals";
 import { fetchMacroData, type MacroEntry } from "./fredMacro";
+import { getTVFundamentalsUS } from "./tvFundamentals";
 import { generateAiReport } from "./groq";
 import { logRecommendation } from "./storage";
 
@@ -348,8 +349,11 @@ async function fetchHistory(symbol: string, period: "3mo" | "6mo"): Promise<{ da
     .map((q: { date: Date | number; close: number }) => ({ date: new Date(q.date), close: q.close as number }));
 }
 
-// One year of daily OHLC for the candlestick chart.
-async function fetchOhlc1y(symbol: string): Promise<Array<{ date: string; open: number; high: number; low: number; close: number }>> {
+// One year of daily OHLC for the candlestick chart (volumes tracked separately
+// for the volume/avgVolume stats).
+async function fetchOhlc1y(
+  symbol: string,
+): Promise<{ candles: Array<{ date: string; open: number; high: number; low: number; close: number }>; volumes: number[] }> {
   const since = new Date();
   since.setFullYear(since.getFullYear() - 1);
 
@@ -358,18 +362,21 @@ async function fetchOhlc1y(symbol: string): Promise<Array<{ date: string; open: 
     interval: "1d",
   });
 
-  return (result.quotes ?? [])
-    .filter(
-      (q: { open?: number | null; high?: number | null; low?: number | null; close?: number | null }) =>
-        q.open != null && q.high != null && q.low != null && q.close != null
-    )
-    .map((q: { date: Date | number; open: number; high: number; low: number; close: number }) => ({
-      date: new Date(q.date).toISOString().split("T")[0],
-      open: q.open as number,
-      high: q.high as number,
-      low: q.low as number,
-      close: q.close as number,
-    }));
+  const candles: Array<{ date: string; open: number; high: number; low: number; close: number }> = [];
+  const volumes: number[] = [];
+  for (const q of result.quotes ?? []) {
+    if (q.open != null && q.high != null && q.low != null && q.close != null) {
+      candles.push({
+        date: new Date(q.date).toISOString().split("T")[0],
+        open: q.open as number,
+        high: q.high as number,
+        low: q.low as number,
+        close: q.close as number,
+      });
+      volumes.push((q.volume as number) ?? 0);
+    }
+  }
+  return { candles, volumes };
 }
 
 // ── Main analysis ────────────────────────────────────────────────────────────
@@ -578,10 +585,11 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   }
 
   // Fetch ticker and SPY history in parallel
-  const [histResult, spyHistory, ohlcResult, summary, searchResult] = await Promise.allSettled([
+  const [histResult, spyHistory, ohlcResult0, tvResult, summary, searchResult] = await Promise.allSettled([
     Promise.resolve(history),
     fetchHistory("SPY", "6mo"),
     fetchOhlc1y(ticker),
+    getTVFundamentalsUS(ticker.replace(/\.(TO|L|DE|PA)$/i, "")),
     yahooFinance.quoteSummary(ticker, {
       modules: ["price", "summaryDetail", "defaultKeyStatistics", "financialData", "earnings"],
     }),
@@ -594,7 +602,8 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   }
 
   const spyHist = spyHistory.status === "fulfilled" ? spyHistory.value : [];
-  const ohlc1y = ohlcResult.status === "fulfilled" ? ohlcResult.value : [];
+  const ohlcResult = ohlcResult0.status === "fulfilled" ? ohlcResult0.value : { candles: [], volumes: [] };
+  const ohlc1y = ohlcResult.candles;
   const sum = summary.status === "fulfilled" ? summary.value : null;
   const searchRes = searchResult.status === "fulfilled" ? searchResult.value : null;
 
@@ -631,27 +640,40 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   const price = sum?.price ?? null;
   const summaryDetail = sum?.summaryDetail ?? null;
   const keyStats = sum?.defaultKeyStatistics ?? null;
+  // TradingView works from datacenter IPs where Yahoo blocks quoteSummary.
+  const tv = tvResult.status === "fulfilled" ? tvResult.value : null;
 
-  const priceChange = price?.regularMarketChange ?? null;
+  const priceChange = price?.regularMarketChange ?? (ohlc1y.length >= 2 ? ohlc1y[ohlc1y.length - 1].close - ohlc1y[ohlc1y.length - 2].close : null);
   const priceChangePct = price?.regularMarketChangePercent != null
     ? price.regularMarketChangePercent * 100
-    : null;
+    : priceChange != null && ohlc1y.length >= 2 && ohlc1y[ohlc1y.length - 2].close !== 0
+      ? ((priceChange / ohlc1y[ohlc1y.length - 2].close) * 100)
+      : null;
+
+  const pick = (tvVal: number | null | undefined, yhVal: number | undefined | null): number | null =>
+    (tvVal != null ? tvVal : yhVal ?? null) as number | null;
 
   const peRatio: number | null =
+    pick(tv?.pe, undefined) ??
     (summaryDetail?.trailingPE as number | undefined) ??
     (keyStats?.trailingEps != null && keyStats.trailingEps !== 0
       ? currentPrice / (keyStats.trailingEps as number)
       : null);
 
-  const eps: number | null = (keyStats?.trailingEps as number | undefined) ?? null;
-  const dividendYield: number | null = summaryDetail?.dividendYield != null
-    ? (summaryDetail.dividendYield as number) * 100
-    : null;
-  const marketCap: number | null = (price?.marketCap as number | undefined) ?? null;
-  const volume: number | null = (price?.regularMarketVolume as number | undefined) ?? null;
-  const avgVolume: number | null = (summaryDetail?.averageVolume as number | undefined) ?? null;
-  const fiftyTwoWeekHigh: number | null = (summaryDetail?.fiftyTwoWeekHigh as number | undefined) ?? null;
-  const fiftyTwoWeekLow: number | null = (summaryDetail?.fiftyTwoWeekLow as number | undefined) ?? null;
+  const eps: number | null = pick(tv?.eps, keyStats?.trailingEps as number | undefined);
+  const dividendYield: number | null = pick(tv?.dividendYield, summaryDetail?.dividendYield != null ? (summaryDetail.dividendYield as number) * 100 : null);
+  const marketCap: number | null = pick(tv?.marketCap, price?.marketCap as number | undefined);
+  // Volume stats from the 1y candles; Yahoo fallback when candles lack volume.
+  const vols = ohlcResult.volumes.filter((v) => v > 0);
+  const volume: number | null =
+    vols.length > 0 ? vols[vols.length - 1] : (price?.regularMarketVolume as number | undefined) ?? null;
+  const avgVolume: number | null =
+    vols.length >= 5 ? Math.round(vols.slice(-30).reduce((a, b) => a + b, 0) / Math.min(vols.length, 30)) : (summaryDetail?.averageVolume as number | undefined) ?? null;
+  // 52-week range computed from the candle data itself (always available).
+  const fiftyTwoWeekHigh: number | null =
+    ohlc1y.length > 0 ? Math.max(...ohlc1y.map((c) => c.high)) : (summaryDetail?.fiftyTwoWeekHigh as number | undefined) ?? null;
+  const fiftyTwoWeekLow: number | null =
+    ohlc1y.length > 0 ? Math.min(...ohlc1y.map((c) => c.low)) : (summaryDetail?.fiftyTwoWeekLow as number | undefined) ?? null;
   const companyName: string | null = (price?.longName as string | undefined) ?? (price?.shortName as string | undefined) ?? null;
 
   // ── Fair value (analyst consensus) ────────────────────────────────────────
