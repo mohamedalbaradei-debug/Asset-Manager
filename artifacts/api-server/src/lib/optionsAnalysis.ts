@@ -100,7 +100,7 @@ async function fetchChainCboe(tickerRaw: string) {
     if (options.length === 0) return null;
     return { data: { quote: { regularMarketPrice: spot }, options }, spot, options };
   } catch (err) {
-    logger.warn({ err, ticker }, "CBOE chain fetch failed");
+    logger.warn({ err, ticker: tickerRaw }, "CBOE chain fetch failed");
     return null;
   }
 }
