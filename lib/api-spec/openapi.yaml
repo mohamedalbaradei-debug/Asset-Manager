@@ -1229,6 +1229,21 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GexPoint"
+        gexChart:
+          type: array
+          description: >
+            Strikes with meaningful net GEX (>=2% of band maximum) — use for
+            the gamma-exposure-by-strike chart so every rendered bar is
+            proportionally visible.
+          items:
+            $ref: "#/components/schemas/GexPoint"
+        flowChart:
+          type: array
+          description: >
+            Strikes with meaningful net delta-dollar flow (>=1% of band
+            maximum) — use for the flow-by-strike chart.
+          items:
+            $ref: "#/components/schemas/GexPoint"
         signal:
           type: string
         explanation:

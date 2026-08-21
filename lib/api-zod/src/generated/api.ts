@@ -357,6 +357,26 @@ export const GetGexDataResponse = zod.object({
   "netFlow": zod.number().optional(),
   "openInterest": zod.number().optional()
 })),
+  "gexChart": zod.array(zod.object({
+  "strike": zod.number().optional(),
+  "callGex": zod.number().optional(),
+  "putGex": zod.number().optional(),
+  "netGex": zod.number().optional(),
+  "callFlow": zod.number().optional(),
+  "putFlow": zod.number().optional(),
+  "netFlow": zod.number().optional(),
+  "openInterest": zod.number().optional()
+})).optional().describe('Strikes with meaningful net GEX (>=2% of band maximum) — use for the gamma-exposure-by-strike chart so every rendered bar is proportionally visible.\n'),
+  "flowChart": zod.array(zod.object({
+  "strike": zod.number().optional(),
+  "callGex": zod.number().optional(),
+  "putGex": zod.number().optional(),
+  "netGex": zod.number().optional(),
+  "callFlow": zod.number().optional(),
+  "putFlow": zod.number().optional(),
+  "netFlow": zod.number().optional(),
+  "openInterest": zod.number().optional()
+})).optional().describe('Strikes with meaningful net delta-dollar flow (>=1% of band maximum) — use for the flow-by-strike chart.\n'),
   "signal": zod.string(),
   "explanation": zod.string()
 }),
@@ -380,6 +400,26 @@ export const GetGexDataResponse = zod.object({
   "netFlow": zod.number().optional(),
   "openInterest": zod.number().optional()
 })),
+  "gexChart": zod.array(zod.object({
+  "strike": zod.number().optional(),
+  "callGex": zod.number().optional(),
+  "putGex": zod.number().optional(),
+  "netGex": zod.number().optional(),
+  "callFlow": zod.number().optional(),
+  "putFlow": zod.number().optional(),
+  "netFlow": zod.number().optional(),
+  "openInterest": zod.number().optional()
+})).optional().describe('Strikes with meaningful net GEX (>=2% of band maximum) — use for the gamma-exposure-by-strike chart so every rendered bar is proportionally visible.\n'),
+  "flowChart": zod.array(zod.object({
+  "strike": zod.number().optional(),
+  "callGex": zod.number().optional(),
+  "putGex": zod.number().optional(),
+  "netGex": zod.number().optional(),
+  "callFlow": zod.number().optional(),
+  "putFlow": zod.number().optional(),
+  "netFlow": zod.number().optional(),
+  "openInterest": zod.number().optional()
+})).optional().describe('Strikes with meaningful net delta-dollar flow (>=1% of band maximum) — use for the flow-by-strike chart.\n'),
   "signal": zod.string(),
   "explanation": zod.string()
 }),

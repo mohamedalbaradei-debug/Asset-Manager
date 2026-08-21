@@ -20,6 +20,10 @@ export interface GexData {
   putFlowTotal?: number;
   netFlowTotal?: number;
   points: GexPoint[];
+  /** Strikes with meaningful net GEX (>=2% of band maximum) — use for the gamma-exposure-by-strike chart so every rendered bar is proportionally visible. */
+  gexChart?: GexPoint[];
+  /** Strikes with meaningful net delta-dollar flow (>=1% of band maximum) — use for the flow-by-strike chart. */
+  flowChart?: GexPoint[];
   signal: string;
   explanation: string;
 }

@@ -410,6 +410,10 @@ export interface GexData {
   putFlowTotal: number;
   netFlowTotal: number;
   points: GexPoint[];
+  /** Strikes with meaningful net GEX — bar set for the gamma chart. */
+  gexChart?: GexPoint[];
+  /** Strikes with meaningful net flow — bar set for the flow chart. */
+  flowChart?: GexPoint[];
   signal: "bullish" | "bearish" | "neutral";
   explanation: string;
 }
@@ -571,10 +575,32 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
       explanation = "Net dealer gamma is near zero — no strong positioning tilt.";
     }
 
-    // Keep chart manageable: strikes within ±12% of spot
-    const lo = spot * 0.88;
-    const hi = spot * 1.12;
-    const chartPoints = points.filter((p) => p.strike >= lo && p.strike <= hi);
+    // Keep the charts readable: focus on strikes within ±6% of spot and drop
+    // sub-pixel noise bars (a few billion-dollar strikes otherwise flatten
+    // hundreds of $10M bars into invisibility). Gamma and flow have different
+    // shapes — a strike can carry billions of directional flow while its
+    // call/put gamma nets to ~zero — so each chart gets its own bar set,
+    // filtered by significance on its own metric.
+    const lo = spot * 0.94;
+    const hi = spot * 1.06;
+    // Strikes with zero open interest are listed but empty — drawing them
+    // just adds invisible bars that wreck the visual proportions.
+    const band = points.filter(
+      (p) => p.strike >= lo && p.strike <= hi && p.openInterest > 0
+    );
+    let chartPoints = band.length > 0 ? band : points;
+    let gexChart = chartPoints;
+    let flowChart = chartPoints;
+    if (band.length > 0) {
+      const maxGex = Math.max(...band.map((p) => Math.abs(p.netGex)), 1);
+      const maxFlow = Math.max(...band.map((p) => Math.abs(p.netFlow)), 1);
+      // Guard: never filter down to a handful of bars.
+      const gexSig = band.filter((p) => Math.abs(p.netGex) >= maxGex * 0.02);
+      const flowSig = band.filter((p) => Math.abs(p.netFlow) >= maxFlow * 0.01);
+      gexChart = gexSig.length >= 12 ? gexSig : band;
+      flowChart = flowSig.length >= 12 ? flowSig : band;
+      chartPoints = gexChart;
+    }
 
     return {
       available: true,
@@ -587,6 +613,8 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
       putFlowTotal,
       netFlowTotal,
       points: chartPoints,
+      gexChart,
+      flowChart,
       signal,
       explanation,
     };

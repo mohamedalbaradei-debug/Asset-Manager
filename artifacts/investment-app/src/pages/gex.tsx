@@ -19,6 +19,24 @@ import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, fmtNum } from "@/components/panels";
 
 function GexPanel({ g, title }: { g: GexData; title: string }) {
+  // Each chart renders its own significance-filtered bar set: a strike can
+  // carry huge directional flow while its call/put gamma nets to ~zero, so
+  // sharing one array leaves invisible slivers on one of the two charts.
+  const gexBars = g.gexChart ?? g.points ?? [];
+  const flowBars = g.flowChart ?? g.points ?? [];
+  const tickInterval = (n: number) => (n > 20 ? Math.floor(n / 10) : 0);
+
+  // Compact dollar axis labels ($-12B, 750M, ...) so bar proportions are readable
+  const fmtAxisUsd = (v: number) => {
+    if (v === 0) return "0";
+    const abs = Math.abs(v);
+    const sign = v < 0 ? "-" : "";
+    if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(abs >= 1e10 ? 0 : 1)}B`;
+    if (abs >= 1e6) return `${sign}$${Math.round(abs / 1e6)}M`;
+    if (abs >= 1e3) return `${sign}$${Math.round(abs / 1e3)}K`;
+    return `${sign}$${abs}`;
+  };
+
   if (!g.available) {
     return (
       <section>
@@ -64,12 +82,12 @@ function GexPanel({ g, title }: { g: GexData; title: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="text-xs font-mono text-muted-foreground mb-3">GAMMA EXPOSURE BY STRIKE</div>
-          <div className="h-[240px] w-full">
+          <div className="h-[260px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={g.points} margin={{ top: 5, right: 0, left: -10, bottom: 0 }}>
+              <BarChart data={gexBars} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="strike" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <XAxis dataKey="strike" interval={tickInterval(gexBars.length)} stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={fmtAxisUsd} width={58} stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
                   itemStyle={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}
@@ -78,7 +96,7 @@ function GexPanel({ g, title }: { g: GexData; title: string }) {
                 />
                 <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
                 <Bar dataKey="netGex" radius={[3, 3, 0, 0]}>
-                  {g.points.map((p, i) => (
+                  {gexBars.map((p, i) => (
                     <Cell key={i} fill={(p.netGex ?? 0) >= 0 ? "#22c55e" : "#ef4444"} />
                   ))}
                 </Bar>
@@ -89,12 +107,12 @@ function GexPanel({ g, title }: { g: GexData; title: string }) {
 
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="text-xs font-mono text-muted-foreground mb-3">NET DELTA-DOLLAR FLOW BY STRIKE</div>
-          <div className="h-[240px] w-full">
+          <div className="h-[260px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={g.points} margin={{ top: 5, right: 0, left: -10, bottom: 0 }}>
+              <BarChart data={flowBars} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="strike" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <XAxis dataKey="strike" interval={tickInterval(flowBars.length)} stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={fmtAxisUsd} width={58} stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
                   itemStyle={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}
@@ -103,7 +121,7 @@ function GexPanel({ g, title }: { g: GexData; title: string }) {
                 />
                 <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
                 <Bar dataKey="netFlow" radius={[3, 3, 0, 0]}>
-                  {g.points.map((p, i) => (
+                  {flowBars.map((p, i) => (
                     <Cell key={i} fill={(p.netFlow ?? 0) >= 0 ? "#22c55e" : "#ef4444"} />
                   ))}
                 </Bar>
