@@ -85,6 +85,13 @@ export const AnalyzeStockResponse = zod.object({
   "priceNorm": zod.number().describe('Normalized price (rebased to 100 at period start)'),
   "spyPriceNorm": zod.number().nullish().describe('Normalized SPY price for comparison')
 })),
+  "ohlc1y": zod.array(zod.object({
+  "date": zod.string(),
+  "open": zod.number(),
+  "high": zod.number(),
+  "low": zod.number(),
+  "close": zod.number()
+}).describe('Daily OHLC candle for the candlestick chart')).optional().describe('One year of daily OHLC candles for the candlestick chart'),
   "news": zod.array(zod.string()),
   "recommendation": zod.string().describe('Combined recommendation. One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL'),
   "score": zod.number().describe('Combined composite score'),

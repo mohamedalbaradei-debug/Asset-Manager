@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { AiReport } from './aiReport';
+import type { Candle } from './candle';
 import type { FairValue } from './fairValue';
 import type { GreeksSnapshot } from './greeksSnapshot';
 import type { HistoricalDataPoint } from './historicalDataPoint';
@@ -57,6 +58,8 @@ export interface AnalysisResult {
   fiftyTwoWeekLow?: number | null;
   explanations: TechnicalExplanations;
   historicalData: HistoricalDataPoint[];
+  /** One year of daily OHLC candles for the candlestick chart */
+  ohlc1y?: Candle[];
   news: string[];
   /** Combined recommendation. One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL */
   recommendation: string;

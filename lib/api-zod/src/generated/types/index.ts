@@ -20,6 +20,7 @@ export * from './calendarData';
 export * from './calendarDataIposItem';
 export * from './calendarDividendRow';
 export * from './calendarEarningsRow';
+export * from './candle';
 export * from './commodityEntry';
 export * from './errorResponse';
 export * from './fairValue';

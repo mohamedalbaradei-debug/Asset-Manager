@@ -348,6 +348,30 @@ async function fetchHistory(symbol: string, period: "3mo" | "6mo"): Promise<{ da
     .map((q: { date: Date | number; close: number }) => ({ date: new Date(q.date), close: q.close as number }));
 }
 
+// One year of daily OHLC for the candlestick chart.
+async function fetchOhlc1y(symbol: string): Promise<Array<{ date: string; open: number; high: number; low: number; close: number }>> {
+  const since = new Date();
+  since.setFullYear(since.getFullYear() - 1);
+
+  const result = await yahooFinance.chart(symbol, {
+    period1: since,
+    interval: "1d",
+  });
+
+  return (result.quotes ?? [])
+    .filter(
+      (q: { open?: number | null; high?: number | null; low?: number | null; close?: number | null }) =>
+        q.open != null && q.high != null && q.low != null && q.close != null
+    )
+    .map((q: { date: Date | number; open: number; high: number; low: number; close: number }) => ({
+      date: new Date(q.date).toISOString().split("T")[0],
+      open: q.open as number,
+      high: q.high as number,
+      low: q.low as number,
+      close: q.close as number,
+    }));
+}
+
 // ── Main analysis ────────────────────────────────────────────────────────────
 
 export interface AnalysisResult {
@@ -377,6 +401,7 @@ export interface AnalysisResult {
     priceNorm: number;
     spyPriceNorm: number | null;
   }>;
+  ohlc1y: Array<{ date: string; open: number; high: number; low: number; close: number }>;
   news: string[];
   recommendation: string;
   score: number;
@@ -553,9 +578,10 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   }
 
   // Fetch ticker and SPY history in parallel
-  const [histResult, spyHistory, summary, searchResult] = await Promise.allSettled([
+  const [histResult, spyHistory, ohlcResult, summary, searchResult] = await Promise.allSettled([
     Promise.resolve(history),
     fetchHistory("SPY", "6mo"),
+    fetchOhlc1y(ticker),
     yahooFinance.quoteSummary(ticker, {
       modules: ["price", "summaryDetail", "defaultKeyStatistics", "financialData", "earnings"],
     }),
@@ -568,6 +594,7 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   }
 
   const spyHist = spyHistory.status === "fulfilled" ? spyHistory.value : [];
+  const ohlc1y = ohlcResult.status === "fulfilled" ? ohlcResult.value : [];
   const sum = summary.status === "fulfilled" ? summary.value : null;
   const searchRes = searchResult.status === "fulfilled" ? searchResult.value : null;
 
@@ -580,10 +607,11 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   const sma50 = calcSMA(closes, 50);
   const sma200 = calcSMA(closes, 200);
 
-  const lows = hist.map((h) => h.close);
-  const highs = hist.map((h) => h.close);
-  const support = Math.min(...lows.slice(-60));
-  const resistance = Math.max(...highs.slice(-60));
+  // Support/resistance from real intraday lows/highs over the last 60 sessions
+  // (falls back to closes when OHLC is unavailable).
+  const srSource = ohlc1y.length >= 20 ? ohlc1y : hist.map((h) => ({ low: h.close, high: h.close }));
+  const support = Math.min(...srSource.slice(-60).map((d) => d.low));
+  const resistance = Math.max(...srSource.slice(-60).map((d) => d.high));
 
   // Build normalized historical data (rebase to 100 at start)
   const basePrice = closes[0];
@@ -828,6 +856,7 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
     fiftyTwoWeekLow,
     explanations,
     historicalData,
+    ohlc1y,
     news,
     recommendation,
     score,

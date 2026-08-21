@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -24,6 +26,7 @@ import {
   AiReportSection,
   DisclaimerSection,
 } from "@/components/report";
+import { CandleChart } from "@/components/CandleChart";
 
 const POPULAR_TICKERS = ["AAPL", "TSLA", "NVDA", "MSFT", "AMD"];
 
@@ -400,6 +403,15 @@ export default function HubPage() {
                     rationale={result.investorRec.rationale}
                   />
                 </div>
+              )}
+
+              {/* Candlestick chart (1Y OHLC + auto support/resistance) */}
+              {result.ohlc1y && result.ohlc1y.length > 0 && (
+                <CandleChart
+                  ohlc={result.ohlc1y}
+                  support={result.support}
+                  resistance={result.resistance}
+                />
               )}
 
               {/* Performance chart */}

@@ -475,6 +475,27 @@ components:
         - price
         - priceNorm
 
+    Candle:
+      type: object
+      description: Daily OHLC candle for the candlestick chart
+      properties:
+        date:
+          type: string
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+      required:
+        - date
+        - open
+        - high
+        - low
+        - close
+
     MacdValues:
       type: object
       properties:
@@ -763,6 +784,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HistoricalDataPoint"
+        ohlc1y:
+          type: array
+          description: One year of daily OHLC candles for the candlestick chart
+          items:
+            $ref: "#/components/schemas/Candle"
         news:
           type: array
           items:

@@ -52,6 +52,17 @@ export interface HistoricalDataPoint {
   spyPriceNorm?: number | null;
 }
 
+/**
+ * Daily OHLC candle for the candlestick chart
+ */
+export interface Candle {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 export interface MacdValues {
   macd: number;
   signal: number;
@@ -240,6 +251,8 @@ export interface AnalysisResult {
   fiftyTwoWeekLow?: number | null;
   explanations: TechnicalExplanations;
   historicalData: HistoricalDataPoint[];
+  /** One year of daily OHLC candles for the candlestick chart */
+  ohlc1y?: Candle[];
   news: string[];
   /** Combined recommendation. One of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL */
   recommendation: string;
