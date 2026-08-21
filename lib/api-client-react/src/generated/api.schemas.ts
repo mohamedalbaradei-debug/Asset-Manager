@@ -810,6 +810,72 @@ export interface PlanResponse {
   disclaimer: string;
 }
 
+export interface EtfQuote {
+  ticker: string;
+  /** @nullable */
+  name?: string | null;
+  category: string;
+  /** @nullable */
+  price?: number | null;
+  /**
+     * Daily change in percent
+     * @nullable
+     */
+  changePct?: number | null;
+  /**
+     * 1-week performance, percent
+     * @nullable
+     */
+  perfWeek?: number | null;
+  /**
+     * 1-month performance, percent
+     * @nullable
+     */
+  perfMonth1?: number | null;
+  /**
+     * 3-month performance, percent
+     * @nullable
+     */
+  perfMonth3?: number | null;
+  /**
+     * 6-month performance, percent
+     * @nullable
+     */
+  perfMonth6?: number | null;
+  /**
+     * Year-to-date performance, percent
+     * @nullable
+     */
+  perfYtd?: number | null;
+  /**
+     * 1-year performance, percent
+     * @nullable
+     */
+  perfYear?: number | null;
+  /**
+     * 3-year annualised performance, percent
+     * @nullable
+     */
+  perf3Year?: number | null;
+  /**
+     * TER in percent (e.g. 0.03)
+     * @nullable
+     */
+  expenseRatioPct?: number | null;
+  /** @nullable */
+  volume?: number | null;
+}
+
+export interface EtfCategoryGroup {
+  category: string;
+  etfs: EtfQuote[];
+}
+
+export interface EtfTrackerData {
+  groups: EtfCategoryGroup[];
+  updatedAt: string;
+}
+
 export type GetSymbolSearchParams = {
 /**
  * Search text (ticker or company name fragment)

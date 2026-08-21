@@ -12,6 +12,7 @@ import { getGexData } from "../lib/optionsAnalysis";
 import { getLatestNews } from "../lib/newsSentiment";
 import { fetchMacroData, type MacroEntry } from "../lib/fredMacro";
 import { getMarketInternals } from "../lib/marketInternals";
+import { getEtfTracker } from "../lib/etfTracker";
 
 const router: IRouter = Router();
 
@@ -38,6 +39,7 @@ const fedCache = makeCache<object>(60 * 60 * 1000);
 const fxCache = makeCache<object>(60 * 60 * 1000);
 const valuationCache = makeCache<object>(6 * 60 * 60 * 1000);
 const shippingCache = makeCache<object>(6 * 60 * 60 * 1000);
+const etfCache = makeCache<object>(30 * 60 * 1000);
 const newsCache = makeCache<object>(10 * 60 * 1000);
 
 async function serve<T>(
@@ -89,6 +91,7 @@ router.get("/fx", (req, res) => serve(req, res, fxCache, getFxData));
 router.get("/valuation", (req, res) => serve(req, res, valuationCache, getValuationData));
 router.get("/shipping", (req, res) => serve(req, res, shippingCache, getShippingData));
 router.get("/news", (req, res) => serve(req, res, newsCache, getLatestNews));
+router.get("/etfs", (req, res) => serve(req, res, etfCache, getEtfTracker));
 
 router.get("/marketpulse", async (req, res): Promise<void> => {
   try {

@@ -87,7 +87,9 @@ async function fetchChainCboe(tickerRaw: string) {
         strike,
         volume: o.volume ?? 0,
         openInterest: o.open_interest ?? 0,
-        impliedVolatility: o.iv ?? 0,
+        // CBOE reports IV as a percent (e.g. 15.5 = 15.5%); Black-Scholes
+        // needs a decimal. Unquoted strikes report iv = 0.
+        impliedVolatility: typeof o.iv === "number" && o.iv > 0 ? o.iv / 100 : 0,
         inTheMoney: cp === "C" ? spot > strike : spot < strike,
       };
       if (cp === "C") bucket.calls.push(contract);
@@ -448,15 +450,23 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
     // Per-strike aggregation across the selected expirations
     const strikeMap = new Map<number, GexPoint>();
 
+    // CBOE's `iv` field is unreliable: unquoted strikes report exactly 0 and
+    // near-dated dailies often report nonsense (0.1% or 500%). Sanitize to a
+    // sane band and fall back to a flat 18% vol — the GEX profile shape is
+    // driven by the OI distribution, so a flat-vol approximation is standard.
+    const FALLBACK_IV = 0.18;
+    const saneIV = (iv: number | null | undefined): number =>
+      typeof iv === "number" && iv >= 0.02 && iv <= 2 ? iv : FALLBACK_IV;
+
     for (const exp of recent) {
       const T = toYears(exp.expirationDate, now);
       for (const c of exp.calls) {
-        if (c.strike <= 0 || c.impliedVolatility == null) continue;
+        if (c.strike <= 0 || !c.impliedVolatility) continue;
         const g = callGreeks({
           spot,
           strike: c.strike,
           timeToExpiryYears: T,
-          impliedVolatility: c.impliedVolatility,
+          impliedVolatility: saneIV(c.impliedVolatility),
           riskFreeRate: RISK_FREE_RATE,
         });
         const oi = c.openInterest ?? 0;
@@ -471,18 +481,21 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
           netFlow: 0,
           openInterest: 0,
         };
-        point.callGex += -(g.gamma * oi * 100 * spot);
+        // Naive dealer GEX (SqueezeMetrics convention): call gamma positive,
+        // put gamma negative. Dollar gamma per 1% move:
+        //   Γ × OI × $100 multiplier × S² × 0.01
+        point.callGex += g.gamma * oi * 100 * spot * spot * 0.01;
         point.callFlow += g.delta * vol * 100 * spot;
         point.openInterest += oi;
         strikeMap.set(c.strike, point);
       }
       for (const p of exp.puts) {
-        if (p.strike <= 0 || p.impliedVolatility == null) continue;
+        if (p.strike <= 0 || !p.impliedVolatility) continue;
         const g = putGreeks({
           spot,
           strike: p.strike,
           timeToExpiryYears: T,
-          impliedVolatility: p.impliedVolatility,
+          impliedVolatility: saneIV(p.impliedVolatility),
           riskFreeRate: RISK_FREE_RATE,
         });
         const oi = p.openInterest ?? 0;
@@ -497,7 +510,7 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
           netFlow: 0,
           openInterest: 0,
         };
-        point.putGex += g.gamma * oi * 100 * spot;
+        point.putGex -= g.gamma * oi * 100 * spot * spot * 0.01;
         point.putFlow += g.delta * vol * 100 * spot;
         point.openInterest += oi;
         strikeMap.set(p.strike, point);
@@ -517,17 +530,26 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
     const putFlowTotal = points.reduce((a, b) => a + b.putFlow, 0);
     const netFlowTotal = callFlowTotal + putFlowTotal;
 
-    // Gamma flip: strike where cumulative net GEX crosses zero
-    let cumulative = 0;
+    // Gamma flip: strike where cumulative net GEX crosses zero. Noise at far
+    // wings produces spurious crossings, so consider only crossings near the
+    // traded band and report the one closest to spot.
     let gammaFlip: number | null = null;
-    let prev = 0;
-    for (const p of points) {
-      cumulative += p.netGex;
-      if ((prev < 0 && cumulative >= 0) || (prev > 0 && cumulative <= 0)) {
-        gammaFlip = p.strike;
-        break;
+    {
+      const lo = spot * 0.88;
+      const hi = spot * 1.12;
+      let cumulative = 0;
+      let prevSign = Math.sign(points[0]?.netGex ?? 0);
+      let best: number | null = null;
+      for (const p of points) {
+        cumulative += p.netGex;
+        if (p.strike >= lo && p.strike <= hi && Math.sign(cumulative) !== prevSign && prevSign !== 0) {
+          if (best == null || Math.abs(p.strike - spot) < Math.abs(best - spot)) {
+            best = p.strike;
+          }
+        }
+        if (cumulative !== 0) prevSign = Math.sign(cumulative);
       }
-      prev = cumulative;
+      gammaFlip = best;
     }
 
     let signal: "bullish" | "bearish" | "neutral";

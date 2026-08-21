@@ -503,6 +503,34 @@ export const GetLatestNewsResponse = zod.object({
 
 
 /**
+ * Curated universe of liquid US-listed ETFs grouped by category with price, daily change and trailing performance windows (1W/1M/3M/6M/YTD/ 1Y/3Y) plus expense ratios, from the TradingView scanner.
+ * @summary ETF performance tracker
+ */
+export const GetEtfTrackerResponse = zod.object({
+  "groups": zod.array(zod.object({
+  "category": zod.string(),
+  "etfs": zod.array(zod.object({
+  "ticker": zod.string(),
+  "name": zod.string().nullish(),
+  "category": zod.string(),
+  "price": zod.number().nullish(),
+  "changePct": zod.number().nullish().describe('Daily change in percent'),
+  "perfWeek": zod.number().nullish().describe('1-week performance, percent'),
+  "perfMonth1": zod.number().nullish().describe('1-month performance, percent'),
+  "perfMonth3": zod.number().nullish().describe('3-month performance, percent'),
+  "perfMonth6": zod.number().nullish().describe('6-month performance, percent'),
+  "perfYtd": zod.number().nullish().describe('Year-to-date performance, percent'),
+  "perfYear": zod.number().nullish().describe('1-year performance, percent'),
+  "perf3Year": zod.number().nullish().describe('3-year annualised performance, percent'),
+  "expenseRatioPct": zod.number().nullish().describe('TER in percent (e.g. 0.03)'),
+  "volume": zod.number().nullish()
+}))
+})),
+  "updatedAt": zod.string()
+})
+
+
+/**
  * @summary Combined market pulse board
  */
 export const GetMarketPulseResponse = zod.object({

@@ -27,6 +27,7 @@ import type {
   AnalysisResult,
   CalendarData,
   ErrorResponse,
+  EtfTrackerData,
   FedData,
   FullUsMacro,
   FxData,
@@ -1307,6 +1308,84 @@ export function useGetLatestNews<TData = Awaited<ReturnType<typeof getLatestNews
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetLatestNewsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetEtfTrackerUrl = () => {
+
+
+
+
+  return `/api/etfs`
+}
+
+/**
+ * Curated universe of liquid US-listed ETFs grouped by category with price, daily change and trailing performance windows (1W/1M/3M/6M/YTD/ 1Y/3Y) plus expense ratios, from the TradingView scanner.
+ * @summary ETF performance tracker
+ */
+export const getEtfTracker = async ( options?: RequestInit): Promise<EtfTrackerData> => {
+
+  return customFetch<EtfTrackerData>(getGetEtfTrackerUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEtfTrackerQueryKey = () => {
+    return [
+    `/api/etfs`
+    ] as const;
+    }
+
+
+export const getGetEtfTrackerQueryOptions = <TData = Awaited<ReturnType<typeof getEtfTracker>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEtfTracker>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEtfTrackerQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEtfTracker>>> = ({ signal }) => getEtfTracker({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEtfTracker>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEtfTrackerQueryResult = NonNullable<Awaited<ReturnType<typeof getEtfTracker>>>
+export type GetEtfTrackerQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary ETF performance tracker
+ */
+
+export function useGetEtfTracker<TData = Awaited<ReturnType<typeof getEtfTracker>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEtfTracker>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEtfTrackerQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

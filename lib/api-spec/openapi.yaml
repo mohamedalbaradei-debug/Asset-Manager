@@ -261,6 +261,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/NewsData"
 
+  /etfs:
+    get:
+      operationId: getEtfTracker
+      tags: [panels]
+      summary: ETF performance tracker
+      description: >
+        Curated universe of liquid US-listed ETFs grouped by category with
+        price, daily change and trailing performance windows (1W/1M/3M/6M/YTD/
+        1Y/3Y) plus expense ratios, from the TradingView scanner.
+      responses:
+        "200":
+          description: ETF groups with recent performance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EtfTrackerData"
+
   /marketpulse:
     get:
       operationId: getMarketPulse
@@ -1841,3 +1858,73 @@ components:
         - projections
         - steps
         - disclaimer
+
+    EtfQuote:
+      type: object
+      properties:
+        ticker:
+          type: string
+        name:
+          type: ["string", "null"]
+        category:
+          type: string
+        price:
+          type: ["number", "null"]
+        changePct:
+          type: ["number", "null"]
+          description: Daily change in percent
+        perfWeek:
+          type: ["number", "null"]
+          description: 1-week performance, percent
+        perfMonth1:
+          type: ["number", "null"]
+          description: 1-month performance, percent
+        perfMonth3:
+          type: ["number", "null"]
+          description: 3-month performance, percent
+        perfMonth6:
+          type: ["number", "null"]
+          description: 6-month performance, percent
+        perfYtd:
+          type: ["number", "null"]
+          description: Year-to-date performance, percent
+        perfYear:
+          type: ["number", "null"]
+          description: 1-year performance, percent
+        perf3Year:
+          type: ["number", "null"]
+          description: 3-year annualised performance, percent
+        expenseRatioPct:
+          type: ["number", "null"]
+          description: TER in percent (e.g. 0.03)
+        volume:
+          type: ["number", "null"]
+      required:
+        - ticker
+        - category
+
+    EtfCategoryGroup:
+      type: object
+      properties:
+        category:
+          type: string
+        etfs:
+          type: array
+          items:
+            $ref: "#/components/schemas/EtfQuote"
+      required:
+        - category
+        - etfs
+
+    EtfTrackerData:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/EtfCategoryGroup"
+        updatedAt:
+          type: string
+      required:
+        - groups
+        - updatedAt

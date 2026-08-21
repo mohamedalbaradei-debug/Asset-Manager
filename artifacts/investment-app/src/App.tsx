@@ -18,6 +18,7 @@ import ShippingPage from '@/pages/shipping';
 import NewsPage from '@/pages/news';
 import WatchlistPage from '@/pages/watchlist';
 import PlannerPage from '@/pages/planner';
+import EtfTrackerPage from '@/pages/etf-tracker';
 import { Layout } from '@/components/layout';
 
 const queryClient = new QueryClient({
@@ -48,6 +49,7 @@ function Router() {
         <Route path="/news" component={NewsPage} />
         <Route path="/watchlist" component={WatchlistPage} />
         <Route path="/planner" component={PlannerPage} />
+        <Route path="/etfs" component={EtfTrackerPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
