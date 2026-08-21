@@ -17,6 +17,7 @@ import ValuationPage from '@/pages/valuation';
 import ShippingPage from '@/pages/shipping';
 import NewsPage from '@/pages/news';
 import WatchlistPage from '@/pages/watchlist';
+import PlannerPage from '@/pages/planner';
 import { Layout } from '@/components/layout';
 
 const queryClient = new QueryClient({
@@ -46,6 +47,7 @@ function Router() {
         <Route path="/shipping" component={ShippingPage} />
         <Route path="/news" component={NewsPage} />
         <Route path="/watchlist" component={WatchlistPage} />
+        <Route path="/planner" component={PlannerPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -39,6 +39,8 @@ import type {
   MoversData,
   NewsData,
   PerformanceData,
+  PlanRequest,
+  PlanResponse,
   SectorRotationData,
   ShippingData,
   SpyQqqRotation,
@@ -1990,5 +1992,77 @@ export const useAiChat = <TError = ErrorType<AiChatReply>,
         TContext
       > => {
       return useMutation(getAiChatMutationOptions(options));
+    }
+
+export const getCreateInvestmentPlanUrl = () => {
+
+
+
+
+  return `/api/plan`
+}
+
+/**
+ * Given available cash, time horizon and risk tolerance, returns a rule-based allocation across stocks/bonds/gold/cash with concrete ETF picks, scenario projections, and action steps. Optional display-currency conversion via ECB reference rates.
+ * @summary Build a personalized investment plan
+ */
+export const createInvestmentPlan = async (planRequest: PlanRequest, options?: RequestInit): Promise<PlanResponse> => {
+
+  return customFetch<PlanResponse>(getCreateInvestmentPlanUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(planRequest)
+  }
+);}
+
+
+
+
+
+export const getCreateInvestmentPlanMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInvestmentPlan>>, TError,{data: BodyType<PlanRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createInvestmentPlan>>, TError,{data: BodyType<PlanRequest>}, TContext> => {
+
+const mutationKey = ['createInvestmentPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInvestmentPlan>>, {data: BodyType<PlanRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createInvestmentPlan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateInvestmentPlanMutationResult = NonNullable<Awaited<ReturnType<typeof createInvestmentPlan>>>
+    export type CreateInvestmentPlanMutationBody = BodyType<PlanRequest>
+    export type CreateInvestmentPlanMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Build a personalized investment plan
+ */
+export const useCreateInvestmentPlan = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInvestmentPlan>>, TError,{data: BodyType<PlanRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createInvestmentPlan>>,
+        TError,
+        {data: BodyType<PlanRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateInvestmentPlanMutationOptions(options));
     }
 

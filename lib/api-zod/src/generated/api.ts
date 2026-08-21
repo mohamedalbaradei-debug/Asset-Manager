@@ -690,3 +690,48 @@ export const AiChatResponse = zod.object({
 })
 
 
+/**
+ * Given available cash, time horizon and risk tolerance, returns a rule-based allocation across stocks/bonds/gold/cash with concrete ETF picks, scenario projections, and action steps. Optional display-currency conversion via ECB reference rates.
+ * @summary Build a personalized investment plan
+ */
+export const createInvestmentPlanBodyCashUsdExclusiveMin = 0;
+
+
+
+export const CreateInvestmentPlanBody = zod.object({
+  "cashUsd": zod.number().gt(createInvestmentPlanBodyCashUsdExclusiveMin).describe('Amount available to invest, in USD'),
+  "horizon": zod.enum(['short', 'medium', 'long']).describe('short = up to 3y, medium = 3-7y, long = 7y+'),
+  "riskTolerance": zod.enum(['conservative', 'balanced', 'aggressive']),
+  "currency": zod.string().nullish().describe('Optional ISO 4217 code for display conversion (e.g. EGP)')
+})
+
+export const CreateInvestmentPlanResponse = zod.object({
+  "allocation": zod.array(zod.object({
+  "assetClass": zod.string(),
+  "percent": zod.number(),
+  "amountUsd": zod.number(),
+  "rationale": zod.string()
+})),
+  "etfs": zod.array(zod.object({
+  "ticker": zod.string(),
+  "name": zod.string(),
+  "assetClass": zod.string(),
+  "percentOfPortfolio": zod.number(),
+  "expenseRatioPct": zod.number().optional()
+})),
+  "projections": zod.array(zod.object({
+  "years": zod.number(),
+  "scenario": zod.string(),
+  "expectedAnnualReturnPct": zod.number(),
+  "projectedValueUsd": zod.number()
+})),
+  "fx": zod.object({
+  "currency": zod.string(),
+  "rate": zod.number(),
+  "projectedValueLocal": zod.number()
+}).optional().describe('Present only when a display-currency conversion was requested and available'),
+  "steps": zod.array(zod.string()),
+  "disclaimer": zod.string()
+})
+
+

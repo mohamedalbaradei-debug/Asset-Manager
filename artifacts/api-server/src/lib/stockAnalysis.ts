@@ -4,8 +4,10 @@ import { logger } from "./logger";
 import { getGoogleNewsSentiment, getRedditSentiment } from "./newsSentiment";
 import { analyzeOptionsFlow, getGreeksSnapshot } from "./optionsAnalysis";
 import { getMarketInternals } from "./marketInternals";
-import { fetchMacroData, type MacroEntry } from "./fredMacro";
+import { fetchMacroData, latestValue, type MacroEntry } from "./fredMacro";
+import { fetchFredSeries } from "./fredMacro";
 import { getTVFundamentalsUS } from "./tvFundamentals";
+import { fetchTvUniverse, findInUniverse, fetchVixSpot } from "./tvUniverse";
 import { generateAiReport } from "./groq";
 import { logRecommendation } from "./storage";
 
@@ -1062,89 +1064,217 @@ export interface TrendingTickerData {
   marketCap: number | null;
 }
 
-export async function getTrendingTickers(): Promise<TrendingTickerData[]> {
-  const results = await Promise.allSettled(
-    TRENDING_SYMBOLS.map((sym) =>
-      yahooFinance.quoteSummary(sym, { modules: ["price"] })
-    )
-  );
+// Yahoo tickers that quoteSummary cannot reach from datacenter IPs are served
+// via yahoo chart (works everywhere) with static display names.
+const INDEX_NAMES: Record<string, string> = {
+  "^N225": "Nikkei 225",
+  "^TWII": "TSEC Weighted",
+  "^HSI": "Hang Seng",
+  "000001.SS": "Shanghai Composite",
+  "399001.SZ": "Shenzhen Component",
+  "^KS11": "KOSPI",
+  "^NSEI": "Nifty 50",
+  "^AXJO": "ASX 200",
+  "^NZ50": "NZX 50",
+  "^STI": "Straits Times",
+  "^JKSE": "IDX Composite",
+  "^KLSE": "KLCI",
+  "^FTSE": "FTSE 100",
+  "^GDAXI": "DAX",
+  "^FCHI": "CAC 40",
+  "^STOXX50E": "Euro Stoxx 50",
+  "^AEX": "AEX",
+  "^IBEX": "IBEX 35",
+  "^SSMI": "SMI",
+  "^ATX": "ATX",
+  "^BFX": "BEL 20",
+  "^OSEAX": "Oslo All-Share",
+  "^OMXS30": "OMX Stockholm 30",
+  "^OMXC25": "OMX Copenhagen 25",
+  "^GSPTSE": "TSX Composite",
+  "^CASE30": "EGX 30",
+  "^TA125.TA": "TA-125",
+  "^XU100": "BIST 100",
+  "^BVSP": "Bovespa",
+  "^MXX": "S&P/BMV IPC",
+  "^MERV": "MERVAL",
+  "^IPSA": "S&P IPSA",
+  "GC=F": "Gold Futures (COMEX)",
+  "CL=F": "WTI Crude Futures",
+  "BTC-USD": "Bitcoin / USD",
+  "ETH-USD": "Ethereum / USD",
+};
 
-  return results
-    .map((r, i) => {
-      if (r.status !== "fulfilled") return null;
-      const p = r.value.price;
-      if (!p || p.regularMarketPrice == null) return null;
-      return {
-        symbol: TRENDING_SYMBOLS[i],
-        name: (p.longName as string | undefined) ?? (p.shortName as string | undefined) ?? null,
-        price: p.regularMarketPrice as number,
-        change: (p.regularMarketChange as number | undefined) ?? 0,
-        changePct: p.regularMarketChangePercent != null
-          ? (p.regularMarketChangePercent as number) * 100
-          : 0,
-        marketCap: (p.marketCap as number | undefined) ?? null,
-      };
-    })
-    .filter((t): t is TrendingTickerData => t !== null);
+const CHART_ONLY_SYMBOLS = [
+  ...Object.keys(INDEX_NAMES),
+  "GC=F", // Gold futures
+  "CL=F", // WTI Crude futures
+  "BTC-USD", // Bitcoin
+  "ETH-USD", // Ethereum
+];
+
+// ETFs are absent from the stock universe; query TV directly (AMEX/NASDAQ).
+const ETF_TICKERS = [
+  "AMEX:SPY", "NASDAQ:QQQ", "AMEX:DIA", "AMEX:IWM", "AMEX:VTI", "AMEX:VOO",
+  "AMEX:GLD", "AMEX:SLV", "AMEX:XLF", "AMEX:XLE", "AMEX:XLK", "AMEX:XLV",
+  "NASDAQ:ARKK",
+];
+
+const US_STOCKS_IN_TRENDING = [
+  "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "JPM", "V",   "WMT",
+  "BRK-B","XOM",  "UNH",  "JNJ",  "PG",   "CVX",  "HD",   "BAC", "KO",  "LLY",
+  "ABBV", "MRK",  "COST", "AVGO", "ACN",  "MCD",  "NKE",  "TXN", "PM",  "MS",
+  "GS",   "AMD",  "INTC", "QCOM", "CRM",  "ADBE", "NFLX", "ORCL",
+  // International US-listed ADRs
+  "TSM", "ASML", "BABA", "SAP", "TM", "SONY", "HDB", "SHOP", "ARM", "NIO",
+];
+
+async function fetchTvBatch(tickers: string[]): Promise<Map<string, TrendingTickerData>> {
+  const out = new Map<string, TrendingTickerData>();
+  if (tickers.length === 0) return out;
+  try {
+    const res = await fetch("https://scanner.tradingview.com/america/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://www.tradingview.com" },
+      body: JSON.stringify({
+        symbols: { tickers, query: { types: [] } },
+        columns: ["name", "close", "change", "change_abs", "market_cap_basic", "description"],
+      }),
+    });
+    if (!res.ok) throw new Error(`TV scan ${res.status}`);
+    const json = (await res.json()) as {
+      data?: Array<{ s: string; d: Array<string | number | null> }>;
+    };
+    for (const row of json.data ?? []) {
+      const [name, close, changePct, changeAbs, mcap, description] = row.d as [
+        string,
+        number,
+        number,
+        number,
+        number | null,
+        string | null,
+      ];
+      if (typeof close !== "number") continue;
+      out.set(row.s, {
+        symbol: name,
+        name: typeof description === "string" ? description : null,
+        price: close,
+        changePct: typeof changePct === "number" ? changePct : 0,
+        change: typeof changeAbs === "number" ? changeAbs : 0,
+        marketCap: typeof mcap === "number" ? mcap : null,
+      });
+    }
+  } catch (err) {
+    logger.warn({ err }, "TV trending batch failed");
+  }
+  return out;
+}
+
+async function fetchChartQuote(symbol: string): Promise<TrendingTickerData | null> {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - 7);
+    const result = await yahooFinance.chart(symbol, { period1: since, interval: "1d" });
+    const meta = result.meta as {
+      regularMarketPrice?: number;
+      previousClose?: number;
+      chartPreviousClose?: number;
+      regularMarketVolume?: number;
+    };
+    const price = meta.regularMarketPrice;
+    if (price == null) return null;
+    const prev = meta.previousClose ?? meta.chartPreviousClose ?? price;
+    return {
+      symbol,
+      name: INDEX_NAMES[symbol] ?? null,
+      price,
+      change: Math.round((price - prev) * 100) / 100,
+      changePct: prev > 0 ? Math.round(((price - prev) / prev) * 10000) / 100 : 0,
+      marketCap: null,
+    };
+  } catch (err) {
+    logger.warn({ err, symbol }, "Chart quote failed");
+    return null;
+  }
+}
+
+export async function getTrendingTickers(): Promise<TrendingTickerData[]> {
+  const [universe, etfMap, chartQuotes] = await Promise.all([
+    fetchTvUniverse(),
+    fetchTvBatch(ETF_TICKERS),
+    Promise.all(CHART_ONLY_SYMBOLS.map(fetchChartQuote)),
+  ]);
+
+  const results: TrendingTickerData[] = [];
+  const seen = new Set<string>();
+
+  for (const sym of US_STOCKS_IN_TRENDING) {
+    const row = findInUniverse(universe, sym);
+    if (!row || seen.has(row.ticker)) continue;
+    seen.add(row.ticker);
+    results.push({
+      symbol: sym.replace("-", "."), // BRK-B → BRK.B for display consistency
+      name: row.description ?? row.name,
+      price: row.close,
+      change: row.changeAbs,
+      changePct: row.changePct,
+      marketCap: null,
+    });
+  }
+
+  for (const [tvTicker, q] of etfMap) {
+    if (seen.has(tvTicker)) continue;
+    seen.add(tvTicker);
+    results.push(q); // description already mapped into q.name by fetchTvBatch
+  }
+
+  for (const q of chartQuotes) {
+    if (q && !seen.has(q.symbol)) {
+      seen.add(q.symbol);
+      results.push(q);
+    }
+  }
+
+  return results;
 }
 
 // ── Breadth calculation ──────────────────────────────────────────────────────
 
-const MEGA_CAP_SYMBOLS = [
-  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "JPM", "JNJ",
-];
-
 export async function calcMarketBreadth(): Promise<{
   aboveSMA50Pct: number;
+  universeSize: number;
   vix: number | null;
   tnxYield: number | null;
   fvxYield: number | null;
   yieldSpread: number | null;
 }> {
-  const since = new Date();
-  since.setMonth(since.getMonth() - 3);
-
-  const [megaResults, vixResult, tnxResult, fvxResult] = await Promise.allSettled([
-    Promise.allSettled(
-      MEGA_CAP_SYMBOLS.map(async (sym) => {
-        const h = await fetchHistory(sym, "3mo");
-        if (h.length < 50) return false;
-        const closes = h.map((d) => d.close);
-        const sma50 = calcSMA(closes, 50);
-        return closes[closes.length - 1] > sma50;
-      })
-    ),
-    yahooFinance.quoteSummary("^VIX", { modules: ["price"] }),
-    yahooFinance.quoteSummary("^TNX", { modules: ["price"] }),
-    yahooFinance.quoteSummary("^FVX", { modules: ["price"] }),
+  const [universe, vix, dgs10, dgs5] = await Promise.all([
+    fetchTvUniverse(),
+    fetchVixSpot(),
+    latestFredValue("DGS10"),
+    latestFredValue("DGS5"),
   ]);
 
-  let aboveSMA50Pct = 0;
-  if (megaResults.status === "fulfilled") {
-    const above = megaResults.value.filter(
-      (r) => r.status === "fulfilled" && r.value === true
-    ).length;
-    aboveSMA50Pct = Math.round((above / MEGA_CAP_SYMBOLS.length) * 100 * 10) / 10;
-  }
+  // Market-wide breadth: % of ~4k liquid US stocks above their 50-day SMA.
+  const withSma = universe.filter((r) => r.sma50 != null);
+  const above = withSma.filter((r) => r.close > (r.sma50 as number)).length;
+  const aboveSMA50Pct =
+    withSma.length > 0 ? Math.round((above / withSma.length) * 1000) / 10 : 0;
 
-  const vix =
-    vixResult.status === "fulfilled"
-      ? ((vixResult.value.price?.regularMarketPrice as number | undefined) ?? null)
-      : null;
-  const tnx =
-    tnxResult.status === "fulfilled"
-      ? ((tnxResult.value.price?.regularMarketPrice as number | undefined) ?? null)
-      : null;
-  const fvx =
-    fvxResult.status === "fulfilled"
-      ? ((fvxResult.value.price?.regularMarketPrice as number | undefined) ?? null)
-      : null;
+  const yieldSpread =
+    dgs10 != null && dgs5 != null ? Math.round((dgs10 - dgs5) * 100) / 100 : null;
 
   return {
     aboveSMA50Pct,
+    universeSize: withSma.length,
     vix,
-    tnxYield: tnx,
-    fvxYield: fvx,
-    yieldSpread: tnx != null && fvx != null ? Math.round((tnx - fvx) * 100) / 100 : null,
+    tnxYield: dgs10,
+    fvxYield: dgs5,
+    yieldSpread,
   };
+}
+
+async function latestFredValue(seriesId: string): Promise<number | null> {
+  const obs = await fetchFredSeries(seriesId, 1);
+  return latestValue(obs);
 }

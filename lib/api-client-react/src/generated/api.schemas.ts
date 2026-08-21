@@ -735,6 +735,81 @@ export interface AiChatReply {
   error?: string;
 }
 
+/**
+ * short = up to 3y, medium = 3-7y, long = 7y+
+ */
+export type PlanRequestHorizon = typeof PlanRequestHorizon[keyof typeof PlanRequestHorizon];
+
+
+export const PlanRequestHorizon = {
+  short: 'short',
+  medium: 'medium',
+  long: 'long',
+} as const;
+
+export type PlanRequestRiskTolerance = typeof PlanRequestRiskTolerance[keyof typeof PlanRequestRiskTolerance];
+
+
+export const PlanRequestRiskTolerance = {
+  conservative: 'conservative',
+  balanced: 'balanced',
+  aggressive: 'aggressive',
+} as const;
+
+export interface PlanRequest {
+  /**
+     * Amount available to invest, in USD
+     * @exclusiveMinimum 0
+     */
+  cashUsd: number;
+  /** short = up to 3y, medium = 3-7y, long = 7y+ */
+  horizon: PlanRequestHorizon;
+  riskTolerance: PlanRequestRiskTolerance;
+  /**
+     * Optional ISO 4217 code for display conversion (e.g. EGP)
+     * @nullable
+     */
+  currency?: string | null;
+}
+
+export interface PlanAllocationSlice {
+  assetClass: string;
+  percent: number;
+  amountUsd: number;
+  rationale: string;
+}
+
+export interface PlanEtfPick {
+  ticker: string;
+  name: string;
+  assetClass: string;
+  percentOfPortfolio: number;
+  expenseRatioPct?: number;
+}
+
+export interface PlanProjection {
+  years: number;
+  scenario: string;
+  expectedAnnualReturnPct: number;
+  projectedValueUsd: number;
+}
+
+export interface PlanFx {
+  currency: string;
+  rate: number;
+  projectedValueLocal: number;
+}
+
+export interface PlanResponse {
+  allocation: PlanAllocationSlice[];
+  etfs: PlanEtfPick[];
+  projections: PlanProjection[];
+  /** Present only when a display-currency conversion was requested and available */
+  fx?: PlanFx;
+  steps: string[];
+  disclaimer: string;
+}
+
 export type GetSymbolSearchParams = {
 /**
  * Search text (ticker or company name fragment)

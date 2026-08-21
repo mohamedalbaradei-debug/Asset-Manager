@@ -400,6 +400,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/AiChatReply"
 
+  /plan:
+    post:
+      operationId: createInvestmentPlan
+      tags: [planner]
+      summary: Build a personalized investment plan
+      description: >
+        Given available cash, time horizon and risk tolerance, returns a
+        rule-based allocation across stocks/bonds/gold/cash with concrete ETF
+        picks, scenario projections, and action steps. Optional display-currency
+        conversion via ECB reference rates.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanRequest"
+      responses:
+        "200":
+          description: Investment plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -1692,3 +1722,122 @@ components:
           type: string
       required:
         - ok
+    PlanRequest:
+      type: object
+      properties:
+        cashUsd:
+          type: number
+          description: Amount available to invest, in USD
+          exclusiveMinimum: 0
+        horizon:
+          type: string
+          enum: [short, medium, long]
+          description: short = up to 3y, medium = 3-7y, long = 7y+
+        riskTolerance:
+          type: string
+          enum: [conservative, balanced, aggressive]
+        currency:
+          type: ["string", "null"]
+          description: Optional ISO 4217 code for display conversion (e.g. EGP)
+      required:
+        - cashUsd
+        - horizon
+        - riskTolerance
+
+    PlanAllocationSlice:
+      type: object
+      properties:
+        assetClass:
+          type: string
+        percent:
+          type: number
+        amountUsd:
+          type: number
+        rationale:
+          type: string
+      required:
+        - assetClass
+        - percent
+        - amountUsd
+        - rationale
+
+    PlanEtfPick:
+      type: object
+      properties:
+        ticker:
+          type: string
+        name:
+          type: string
+        assetClass:
+          type: string
+        percentOfPortfolio:
+          type: number
+        expenseRatioPct:
+          type: number
+      required:
+        - ticker
+        - name
+        - assetClass
+        - percentOfPortfolio
+
+    PlanProjection:
+      type: object
+      properties:
+        years:
+          type: integer
+        scenario:
+          type: string
+        expectedAnnualReturnPct:
+          type: number
+        projectedValueUsd:
+          type: number
+      required:
+        - years
+        - scenario
+        - expectedAnnualReturnPct
+        - projectedValueUsd
+
+    PlanFx:
+      type: object
+      properties:
+        currency:
+          type: string
+        rate:
+          type: number
+        projectedValueLocal:
+          type: number
+      required:
+        - currency
+        - rate
+        - projectedValueLocal
+
+    PlanResponse:
+      type: object
+      properties:
+        allocation:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanAllocationSlice"
+        etfs:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanEtfPick"
+        projections:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanProjection"
+        fx:
+          description: Present only when a display-currency conversion was requested and available
+          $ref: "#/components/schemas/PlanFx"
+        steps:
+          type: array
+          items:
+            type: string
+        disclaimer:
+          type: string
+      required:
+        - allocation
+        - etfs
+        - projections
+        - steps
+        - disclaimer

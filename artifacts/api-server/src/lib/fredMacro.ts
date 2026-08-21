@@ -27,27 +27,50 @@ export async function fetchFredSeries(seriesId: string, limit = 15): Promise<Fre
   }
 
   // Keyless fallback: FRED's public graph CSV (no API key required).
-  try {
-    const res = await fetch(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${seriesId}`);
-    if (!res.ok) {
-      logger.warn({ seriesId, status: res.status }, "FRED CSV fallback failed");
+  // FRED intermittently serves a bot-challenge page (HTTP 200 + HTML), so
+  // validate the payload and retry with backoff before giving up.
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${seriesId}`);
+      if (!res.ok) {
+        logger.warn({ seriesId, status: res.status }, "FRED CSV fallback failed");
+        return [];
+      }
+      const csv = await res.text();
+      if (!csv.startsWith("DATE") && !csv.startsWith("date") && !csv.includes(",")) {
+        logger.warn({ seriesId, attempt }, "FRED CSV returned non-CSV payload, retrying");
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 400 * attempt));
+          continue;
+        }
+        return [];
+      }
+      const rows = csv
+        .trim()
+        .split("\n")
+        .slice(1)
+        .map((line) => {
+          const [date, value] = line.split(",");
+          return { date: date ?? "", value: value ?? "" };
+        })
+        .filter(
+          (o) =>
+            /^\d{4}-\d{2}-\d{2}$/.test(o.date) &&
+            o.value !== "" &&
+            o.value !== "."
+        );
+      return rows.slice(-limit).reverse();
+    } catch (err) {
+      logger.warn({ seriesId, err }, "FRED CSV fallback threw");
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+        continue;
+      }
       return [];
     }
-    const csv = await res.text();
-    const rows = csv
-      .trim()
-      .split("\n")
-      .slice(1)
-      .map((line) => {
-        const [date, value] = line.split(",");
-        return { date: date ?? "", value: value ?? "" };
-      })
-      .filter((o) => o.date && o.value && o.value !== ".");
-    return rows.slice(-limit).reverse();
-  } catch (err) {
-    logger.warn({ seriesId, err }, "FRED CSV fallback threw");
-    return [];
   }
+  return [];
 }
 
 export function latestValue(obs: FredObservation[]): number | null {

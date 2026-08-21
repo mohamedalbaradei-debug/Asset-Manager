@@ -13,6 +13,7 @@ import {
   Ship,
   Newspaper,
   Star,
+  Calculator,
   type LucideIcon,
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
@@ -39,6 +40,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/", label: "Terminal", icon: LayoutDashboard },
       { href: "/market", label: "Market Macro", icon: Activity },
+      { href: "/planner", label: "Planner", icon: Calculator },
     ],
   },
   {

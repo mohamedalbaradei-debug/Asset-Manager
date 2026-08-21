@@ -1,11 +1,14 @@
 import { yahooFinance } from "./yahoo";
 import { logger } from "./logger";
+import { fetchTvUniverse, computeTrinFromUniverse } from "./tvUniverse";
+import { fetchFredSeries, latestValue } from "./fredMacro";
 
 /**
  * Market internals: Arms Index (TRIN) and excess-liquidity proxy.
  *
  * TRIN (Trading Index / Arms Index) gauges whether volume is flowing into
- * advancing or declining issues:
+ * advancing or declining issues. Yahoo delisted ^TRIN, so we compute it
+ * across the full US stock universe from TradingView data:
  *   - TRIN > 1  → more volume in declining stocks (bearish pressure)
  *   - TRIN < 1  → more volume in advancing stocks (bullish pressure)
  *
@@ -29,6 +32,14 @@ async function latestClose(symbol: string): Promise<number | null> {
   }
 }
 
+async function tnxYield(): Promise<number | null> {
+  // ^TNX is quoted as yield×10 on some feeds; FRED DGS10 is authoritative.
+  const dgs10 = latestValue(await fetchFredSeries("DGS10", 1));
+  if (dgs10 != null) return dgs10;
+  const chartVal = await latestClose("^TNX");
+  return chartVal != null && chartVal < 20 ? chartVal : null; // guard against ×10 quoting
+}
+
 export interface MarketInternals {
   trin: number | null;
   trinSignal: "bullish" | "bearish" | "neutral";
@@ -39,7 +50,11 @@ export interface MarketInternals {
 }
 
 export async function getMarketInternals(): Promise<MarketInternals> {
-  const [trin, tnx] = await Promise.all([latestClose("^TRIN"), latestClose("^TNX")]);
+  const universe = await fetchTvUniverse();
+  const [trin, tnx] = await Promise.all([
+    Promise.resolve(universe.length > 0 ? computeTrinFromUniverse(universe) : latestClose("^TRIN")),
+    tnxYield(),
+  ]);
 
   let trinSignal: MarketInternals["trinSignal"] = "neutral";
   let trinExplanation: string;

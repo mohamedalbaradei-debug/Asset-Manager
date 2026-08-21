@@ -35,7 +35,7 @@ const US_MACRO_SERIES: Array<{ series: string; label: string; fmt: (v: number) =
   { series: "DCOILWTICO", label: "WTI Crude (USD/bbl)", fmt: (v) => `$${v.toFixed(2)}` },
   { series: "DTWEXBGS", label: "Broad Dollar Index", fmt: (v) => v.toFixed(2) },
   { series: "PAYEMS", label: "Nonfarm Payrolls (K)", fmt: (v) => `${(v / 1000).toFixed(0)}K` },
-  { series: "M2SL", label: "M2 Money Supply", fmt: (v) => `$${(v / 1e12).toFixed(2)}T` },
+  { series: "M2SL", label: "M2 Money Supply", fmt: (v) => `$${(v / 1e9).toFixed(2)}T` },
   { series: "UMCSENT", label: "UMich Consumer Sentiment", fmt: (v) => v.toFixed(1) },
   { series: "T10YIE", label: "10Y Breakeven Inflation", fmt: (v) => `${v.toFixed(2)}%` },
   { series: "DRTSCILM", label: "Banks Tightening C&I (SLOOS)", fmt: (v) => `${v.toFixed(1)}%` },
@@ -90,14 +90,18 @@ export async function getFullUsMacro(): Promise<{ items: DataPoint[]; updatedAt:
 
 // ── Global macro (cross-country) ─────────────────────────────────────────────
 
-const GLOBAL_CPI_SERIES: Array<{ country: string; code: string; series: string; label: string }> = [
-  { country: "USA", code: "US", series: "CPALTT01USM657N", label: "United States" },
-  { country: "CHN", code: "CN", series: "CPALTT01CNM657N", label: "China" },
-  { country: "JPN", code: "JP", series: "CPALTT01JPM657N", label: "Japan" },
-  { country: "DEU", code: "DE", series: "CPALTT01EZ19M657N", label: "Euro Area" },
-  { country: "GBR", code: "GB", series: "CPALTT01GBM657N", label: "United Kingdom" },
-  { country: "IND", code: "IN", series: "CPALTT01INM657N", label: "India" },
-  { country: "BRA", code: "BR", series: "CPALTT01BRM657N", label: "Brazil" },
+// CPI as YoY % computed from index levels (CPIAUCSL-style series are price
+// indices; dividing by the value 12 months back gives a true year-over-year
+// rate). The OECD CPALTT01* "growth rate" series are monthly MoM and some
+// (Euro area / Brazil) have been withdrawn from FRED entirely.
+const GLOBAL_CPI_INDEX_SERIES: Array<{ country: string; code: string; series: string }> = [
+  { country: "USA", code: "US", series: "CPIAUCSL" },
+  { country: "CHN", code: "CN", series: "CHNCPIALLMINMEI" },
+  { country: "JPN", code: "JP", series: "JPNCPIALLMINMEI" },
+  { country: "DEU", code: "DE", series: "CP0000EZ19M086NEST" },
+  { country: "GBR", code: "GB", series: "GBRCPIALLMINMEI" },
+  { country: "IND", code: "IN", series: "INDCPIALLMINMEI" },
+  { country: "BRA", code: "BR", series: "BRACPIALLMINMEI" },
 ];
 
 const GLOBAL_SHORT_RATE_SERIES: Array<{ country: string; series: string; label: string }> = [
@@ -107,8 +111,28 @@ const GLOBAL_SHORT_RATE_SERIES: Array<{ country: string; series: string; label: 
   { country: "DEU", series: "IR3TIB01EZM156N", label: "Euro Area" },
   { country: "GBR", series: "IR3TIB01GBM156N", label: "United Kingdom" },
   { country: "IND", series: "IRSTCI01INM156N", label: "India" },
-  { country: "BRA", series: "IR3TIB01BRM156N", label: "Brazil" },
+  { country: "BRA", series: "IRSTCI01BRM156N", label: "Brazil" }, // IR3TIB01BRM156N withdrawn
 ];
+
+/** YoY % change from an index-level series (last vs 12 observations back). */
+async function latestYoYFromIndex(seriesId: string): Promise<number | null> {
+  const obs = await fetchFredSeries(seriesId, 14);
+  if (obs.length < 13) return null;
+  const now = parseFloat(obs[0].value);
+  const yearAgo = parseFloat(obs[12].value);
+  if (!isFinite(now) || !isFinite(yearAgo) || yearAgo <= 0) return null;
+  return Math.round(((now / yearAgo - 1) * 100) * 100) / 100;
+}
+
+const COUNTRY_LABELS: Record<string, string> = {
+  USA: "United States",
+  CHN: "China",
+  JPN: "Japan",
+  DEU: "Euro Area",
+  GBR: "United Kingdom",
+  IND: "India",
+  BRA: "Brazil",
+};
 
 export interface GlobalMacroRow {
   country: string;
@@ -124,9 +148,9 @@ export async function getGlobalMacro(): Promise<{
   note: string | null;
 }> {
   const cpiResults = await Promise.allSettled(
-    GLOBAL_CPI_SERIES.map(async (c) => ({
+    GLOBAL_CPI_INDEX_SERIES.map(async (c) => ({
       country: c.country,
-      v: latestValue(await fetchFredSeries(c.series, 2)),
+      v: await latestYoYFromIndex(c.series),
     }))
   );
   const rateResults = await Promise.allSettled(
@@ -145,8 +169,8 @@ export async function getGlobalMacro(): Promise<{
     if (r.status === "fulfilled") rateMap.set(r.value.country, r.value.v);
   });
 
-  const rows: GlobalMacroRow[] = GLOBAL_CPI_SERIES.map((c) => ({
-    country: c.label,
+  const rows: GlobalMacroRow[] = GLOBAL_CPI_INDEX_SERIES.map((c) => ({
+    country: COUNTRY_LABELS[c.country] ?? c.country,
     code: c.code,
     cpiYoY: cpiMap.get(c.country) ?? null,
     shortRate: rateMap.get(c.country) ?? null,

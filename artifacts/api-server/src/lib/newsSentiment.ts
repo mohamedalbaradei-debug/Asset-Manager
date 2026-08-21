@@ -1,5 +1,6 @@
 import { fetchRss, type RssItem } from "./rss";
 import { aggregateSentiment } from "./sentiment";
+import { logger } from "./logger";
 
 /**
  * News & social sentiment.
@@ -63,10 +64,63 @@ export async function getGoogleNewsSentiment(ticker: string): Promise<SentimentR
 
 /**
  * Fetch Reddit search results for a ticker and score the post titles.
+ * Reddit blocks datacenter IPs, so fall back to Mastodon's public hashtag
+ * timeline when the RSS feed is unreachable or empty.
  */
 export async function getRedditSentiment(ticker: string): Promise<SentimentReport> {
-  const items = await fetchRss(REDDIT_RSS_URL(ticker));
-  return toReport(items, "Reddit");
+  try {
+    const items = await fetchRss(REDDIT_RSS_URL(ticker));
+    if (items.length > 0) return toReport(items, "Reddit");
+  } catch (err) {
+    logger.warn({ err, ticker }, "Reddit RSS failed, falling back to Mastodon");
+  }
+  return getMastodonSentiment(ticker);
+}
+
+interface MastodonStatus {
+  url?: string;
+  created_at?: string;
+  content?: string;
+  spoiler_text?: string;
+}
+
+/**
+ * Social fallback via Mastodon's keyless public API (mastodon.social).
+ */
+export async function getMastodonSentiment(ticker: string): Promise<SentimentReport> {
+  const tag = ticker.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const urls = [
+    `https://mastodon.social/api/v1/timelines/tag/${encodeURIComponent(tag)}?limit=20`,
+    `https://mastodon.social/api/v1/timelines/tag/${encodeURIComponent(`$${tag}`)}?limit=20`,
+  ];
+
+  const items: RssItem[] = [];
+  for (const url of urls) {
+    if (items.length >= 5) break;
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) continue;
+      const statuses = (await res.json()) as MastodonStatus[];
+      for (const s of statuses) {
+        const text = (s.spoiler_text || s.content || "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!text) continue;
+        items.push({
+          title: text.slice(0, 300),
+          link: s.url ?? null,
+          description: null,
+          publishedAt: s.created_at ?? null,
+          source: "Mastodon",
+        });
+      }
+    } catch (err) {
+      logger.warn({ err, url }, "Mastodon timeline failed");
+    }
+  }
+  return toReport(items.slice(0, 10), "Mastodon");
 }
 
 /** Latest general market headlines from curated free RSS feeds. */
