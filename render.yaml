@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: asset-manager
+    runtime: node
+    plan: free
+    buildCommand: corepack prepare pnpm@latest --activate && pnpm install && pnpm run build
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "20"
+      # Required by vite.config.ts at build time (frontend is built by the root build)
+      - key: PORT
+        value: "10000"
+      - key: BASE_PATH
+        value: /
+      # Writable dir for runtime CSV/JSON storage (ephemeral on free plan)
+      - key: DATA_DIR
+        value: /tmp/am-data
+      # Required: free Postgres, e.g. from neon.tech (create DB, paste pooled URL)
+      - key: DATABASE_URL
+        sync: false
+      # Optional integrations
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        sync: false
+      - key: FRED_API_KEY
+        sync: false
