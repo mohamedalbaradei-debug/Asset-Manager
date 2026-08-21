@@ -5,10 +5,13 @@
  * AI Investment Assistant API
  * OpenAPI spec version: 0.2.0
  */
+import type { SectorRotationDataSpyDailyItem } from './sectorRotationDataSpyDailyItem';
 
 export type SectorRotationDataSpy = {
   /** @nullable */
   change1dPct?: number | null;
   /** @nullable */
   change1wPct?: number | null;
+  /** Cumulative % return for SPY over the last ~90 trading days, oldest first. */
+  daily?: SectorRotationDataSpyDailyItem[];
 };

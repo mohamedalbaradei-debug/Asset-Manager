@@ -5,6 +5,7 @@
  * AI Investment Assistant API
  * OpenAPI spec version: 0.2.0
  */
+import type { ShippingPoint } from './shippingPoint';
 
 export interface ShippingRow {
   chokepoint: string;
@@ -14,4 +15,6 @@ export interface ShippingRow {
   vessels?: number | null;
   status: string;
   note: string;
+  /** Daily transit series over the last ~year, oldest first. */
+  series?: ShippingPoint[];
 }

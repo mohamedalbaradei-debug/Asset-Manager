@@ -55,4 +55,5 @@ Thumbs.db
 
 # Runtime data (watchlist + performance log)
 /data/
+/artifacts/api-server/data/
 *.log

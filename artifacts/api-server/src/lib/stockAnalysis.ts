@@ -541,11 +541,20 @@ const TICKER_ALIASES: Record<string, string> = {
 
 export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   const upper = tickerRaw.toUpperCase().trim().replace(/\s+/g, "");
-  const ticker = TICKER_ALIASES[upper] ?? upper;
+  let ticker = TICKER_ALIASES[upper] ?? upper;
+
+  // Yahoo uses a hyphen for US class shares (BRK-B) but a dot for exchange suffixes
+  // (SAP.DE, VOD.L). If the literal symbol has no history, retry with dots -> hyphens.
+  let history = await fetchHistory(ticker, "6mo").catch(() => []);
+  if (history.length === 0 && ticker.includes(".")) {
+    const alt = ticker.replace(/\./g, "-");
+    history = await fetchHistory(alt, "6mo").catch(() => []);
+    if (history.length > 0) ticker = alt;
+  }
 
   // Fetch ticker and SPY history in parallel
-  const [history, spyHistory, summary, searchResult] = await Promise.allSettled([
-    fetchHistory(ticker, "6mo"),
+  const [histResult, spyHistory, summary, searchResult] = await Promise.allSettled([
+    Promise.resolve(history),
     fetchHistory("SPY", "6mo"),
     yahooFinance.quoteSummary(ticker, {
       modules: ["price", "summaryDetail", "defaultKeyStatistics", "financialData", "earnings"],
@@ -553,7 +562,7 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
     yahooFinance.search(ticker, { newsCount: 5 }),
   ]);
 
-  const hist = history.status === "fulfilled" ? history.value : [];
+  const hist = histResult.status === "fulfilled" ? histResult.value : [];
   if (hist.length === 0) {
     throw new Error(`No data found for ticker: ${ticker}`);
   }

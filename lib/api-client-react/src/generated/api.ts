@@ -30,6 +30,7 @@ import type {
   FedData,
   FullUsMacro,
   FxData,
+  GetSymbolSearchParams,
   GexResponse,
   GlobalMacro,
   HealthStatus,
@@ -41,6 +42,7 @@ import type {
   SectorRotationData,
   ShippingData,
   SpyQqqRotation,
+  SymbolSearchData,
   TrendingTicker,
   ValuationData,
   WatchlistAddInput,
@@ -143,6 +145,91 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetSymbolSearchUrl = (params: GetSymbolSearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/search?${stringifiedParams}` : `/api/search`
+}
+
+/**
+ * Searches stocks and ETFs on NYSE, LSE, Frankfurt (Xetra), Euronext and other exchanges via Yahoo.
+ * @summary Live symbol search across all exchanges
+ */
+export const getSymbolSearch = async (params: GetSymbolSearchParams, options?: RequestInit): Promise<SymbolSearchData> => {
+
+  return customFetch<SymbolSearchData>(getGetSymbolSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSymbolSearchQueryKey = (params?: GetSymbolSearchParams,) => {
+    return [
+    `/api/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSymbolSearchQueryOptions = <TData = Awaited<ReturnType<typeof getSymbolSearch>>, TError = ErrorType<unknown>>(params: GetSymbolSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSymbolSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSymbolSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSymbolSearch>>> = ({ signal }) => getSymbolSearch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSymbolSearch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSymbolSearchQueryResult = NonNullable<Awaited<ReturnType<typeof getSymbolSearch>>>
+export type GetSymbolSearchQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Live symbol search across all exchanges
+ */
+
+export function useGetSymbolSearch<TData = Awaited<ReturnType<typeof getSymbolSearch>>, TError = ErrorType<unknown>>(
+ params: GetSymbolSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSymbolSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSymbolSearchQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -5,6 +5,7 @@
  * AI Investment Assistant API
  * OpenAPI spec version: 0.2.0
  */
+import type { SectorRotationItemDailyItem } from './sectorRotationItemDailyItem';
 
 export interface SectorRotationItem {
   symbol: string;
@@ -17,4 +18,6 @@ export interface SectorRotationItem {
   change1mPct?: number | null;
   /** @nullable */
   relStrengthSpy?: number | null;
+  /** Cumulative % return over the last ~90 trading days, oldest first. */
+  daily?: SectorRotationItemDailyItem[];
 }

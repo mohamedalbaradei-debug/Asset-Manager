@@ -4,14 +4,67 @@ import {
   getGetSectorRotationQueryKey,
   type SectorRotationItem,
 } from "@workspace/api-client-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ReferenceLine,
+} from "recharts";
 import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, fmtPct, pctColor, StatusBadge } from "@/components/panels";
+
+const COLORS = [
+  "#22d3ee", "#a78bfa", "#f472b6", "#34d399", "#fbbf24",
+  "#60a5fa", "#fb7185", "#4ade80", "#facc15", "#2dd4bf", "#c084fc",
+];
 
 function relBadge(rel: number | null | undefined): string {
   if (rel == null) return "neutral";
   if (rel > 0.5) return "bullish";
   if (rel < -0.5) return "bearish";
   return "neutral";
+}
+
+function shortDate(d: string): string {
+  const dt = new Date(`${d}T00:00:00Z`);
+  return dt.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+}
+
+function fullDate(d: string): string {
+  const dt = new Date(`${d}T00:00:00Z`);
+  return dt.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+interface RotationPoint {
+  date: string;
+  [key: string]: string | number | null;
+}
+
+function buildRotationData(
+  sectors: SectorRotationItem[],
+  spyDaily: Array<{ date: string; retPct: number | null }> | undefined
+): RotationPoint[] {
+  const byDate = new Map<string, RotationPoint>();
+  for (const s of sectors) {
+    for (const p of s.daily ?? []) {
+      const row = byDate.get(p.date) ?? { date: p.date };
+      row[s.symbol] = p.retPct;
+      byDate.set(p.date, row);
+    }
+  }
+  for (const p of spyDaily ?? []) {
+    const row = byDate.get(p.date) ?? { date: p.date };
+    row["SPY"] = p.retPct;
+    byDate.set(p.date, row);
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function SectorRow({ s }: { s: SectorRotationItem }) {
@@ -52,6 +105,12 @@ export default function SectorRotationPage() {
     query: { queryKey: getGetSectorRotationQueryKey() },
   });
 
+  const rotationData = data ? buildRotationData(data.sectors, data.spy.daily) : [];
+
+  const relSorted = data
+    ? [...data.sectors].sort((a, b) => (b.relStrengthSpy ?? 0) - (a.relStrengthSpy ?? 0))
+    : [];
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <SectionHeader title="SECTOR_ROTATION" updatedAt={data?.updatedAt} />
@@ -59,6 +118,72 @@ export default function SectorRotationPage() {
       {isError && <ErrorState message="Could not load sector rotation." />}
       {data && (
         <>
+          <section>
+            <SectionTitle>ROTATION TREND — CUMULATIVE RETURN VS 90 DAYS AGO</SectionTitle>
+            <div className="bg-card border border-border rounded-xl p-5">
+              <div className="h-[320px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={rotationData} margin={{ top: 5, right: 8, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="date" tickFormatter={shortDate} stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} minTickGap={50} />
+                    <YAxis tickFormatter={(v: number) => `${v}%`} stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                      itemStyle={{ fontFamily: "var(--font-mono)", fontSize: "11px" }}
+                      labelStyle={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "hsl(var(--muted-foreground))" }}
+                      labelFormatter={(label: string) => fullDate(label)}
+                      formatter={(val: number, name: string) => [`${val > 0 ? "+" : ""}${val?.toFixed?.(2) ?? val}%`, name]}
+                    />
+                    <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
+                    {data.sectors.map((s, i) => (
+                      <Line key={s.symbol} dataKey={s.symbol} name={s.symbol} stroke={COLORS[i % COLORS.length]} strokeWidth={1.2} dot={false} />
+                    ))}
+                    <Line dataKey="SPY" name="SPY" stroke="hsl(var(--foreground))" strokeWidth={2} strokeDasharray="6 3" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
+                {data.sectors.map((s, i) => (
+                  <span key={s.symbol} className="inline-flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                    {s.symbol}
+                  </span>
+                ))}
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-foreground">
+                  <span className="w-3 h-0.5" style={{ background: "hsl(var(--foreground))" }} />
+                  SPY
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <SectionTitle>RELATIVE STRENGTH VS SPY (1 WEEK)</SectionTitle>
+            <div className="bg-card border border-border rounded-xl p-5">
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={relSorted} layout="vertical" margin={{ top: 5, right: 12, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" tickFormatter={(v: number) => `${v}%`} stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis type="category" dataKey="symbol" width={110} stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                      itemStyle={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}
+                      labelStyle={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "hsl(var(--muted-foreground))" }}
+                      formatter={(val: number) => [`${val > 0 ? "+" : ""}${val?.toFixed?.(2) ?? val}%`, "vs SPY (1W)"]}
+                    />
+                    <ReferenceLine x={0} stroke="hsl(var(--muted-foreground))" />
+                    <Bar dataKey="relStrengthSpy" radius={[0, 3, 3, 0]}>
+                      {relSorted.map((s) => (
+                        <Cell key={s.symbol} fill={(s.relStrengthSpy ?? 0) >= 0 ? "#22c55e" : "#ef4444"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </section>
+
           <section>
             <SectionTitle>GICS SECTORS VS SPY</SectionTitle>
             <div className="bg-card border border-border rounded-xl overflow-hidden">

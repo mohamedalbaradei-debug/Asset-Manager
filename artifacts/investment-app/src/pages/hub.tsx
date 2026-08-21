@@ -1,6 +1,6 @@
 import React from "react";
 import { Search, Loader2, ArrowUpRight, ArrowDownRight, BarChart3, AlertCircle, Activity, TrendingUp, LineChart as LineChartIcon, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
-import { useAnalyzeStock, useGetTrendingTickers, getGetTrendingTickersQueryKey } from "@workspace/api-client-react";
+import { useAnalyzeStock, useGetTrendingTickers, useGetSymbolSearch, getGetTrendingTickersQueryKey, getGetSymbolSearchQueryKey, type SymbolSearchResult } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import {
   LineChart,
@@ -26,6 +26,19 @@ import {
 } from "@/components/report";
 
 const POPULAR_TICKERS = ["AAPL", "TSLA", "NVDA", "MSFT", "AMD"];
+
+const EXCHANGE_NAMES: Record<string, string> = {
+  NYQ: "NYSE", NMS: "NASDAQ", NMQ: "NASDAQ", NGM: "NASDAQ", PCX: "NYSE",
+  GER: "Frankfurt", FRA: "Frankfurt", XET: "Xetra",
+  LSE: "London", LON: "London",
+  EBS: "Swiss", VTX: "Swiss", SWX: "Swiss",
+  AQS: "Amsterdam", AMS: "Amsterdam", PA: "Paris",
+  MIL: "Milan", BUD: "Budapest", MAD: "Madrid",
+};
+
+function exchangeName(code: string | null | undefined): string {
+  return code ? (EXCHANGE_NAMES[code] ?? code) : "";
+}
 
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
@@ -126,21 +139,76 @@ function RecCard({ label, icon, recommendation, score, rationale }: RecCardProps
 export default function HubPage() {
   const [ticker, setTicker] = React.useState("");
   const [activeTab, setActiveTab] = React.useState<"overview" | "technicals">("overview");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
+  const [showDropdown, setShowDropdown] = React.useState(false);
+  const [highlighted, setHighlighted] = React.useState(0);
 
   const analyzeStock = useAnalyzeStock();
   const { data: trendingTickers } = useGetTrendingTickers({
     query: { queryKey: getGetTrendingTickersQueryKey() },
   });
+  const { data: searchData } = useGetSymbolSearch(
+    { q: debouncedSearch },
+    { query: { queryKey: getGetSymbolSearchQueryKey({ q: debouncedSearch }), enabled: debouncedSearch.trim().length >= 2 } }
+  );
+
+  const searchResults = searchData?.results ?? [];
+
+  React.useEffect(() => {
+    const q = ticker.trim();
+    if (q.length < 2) {
+      setDebouncedSearch("");
+      setShowDropdown(false);
+      return;
+    }
+    const t = setTimeout(() => setDebouncedSearch(q), 300);
+    return () => clearTimeout(t);
+  }, [ticker]);
+
+  const selectResult = (symbol: string) => {
+    setTicker(symbol);
+    setShowDropdown(false);
+    setHighlighted(0);
+    analyzeStock.mutate({ data: { ticker: symbol } });
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!ticker.trim()) return;
+    setShowDropdown(false);
     analyzeStock.mutate({ data: { ticker: ticker.toUpperCase() } });
   };
 
   const handleChipClick = (t: string) => {
     setTicker(t);
+    setShowDropdown(false);
     analyzeStock.mutate({ data: { ticker: t } });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || searchResults.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlighted((h) => (h + 1) % searchResults.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlighted((h) => (h - 1 + searchResults.length) % searchResults.length);
+    } else if (e.key === "Enter") {
+      const typed = ticker.trim().toUpperCase();
+      const exact = searchResults.find((r) => r.symbol.toUpperCase() === typed);
+      if (exact) {
+        e.preventDefault();
+        selectResult(exact.symbol);
+      } else {
+        const hit = searchResults[highlighted];
+        if (hit) {
+          e.preventDefault();
+          selectResult(hit.symbol);
+        }
+      }
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+    }
   };
 
   const result = analyzeStock.data;
@@ -156,8 +224,12 @@ export default function HubPage() {
             <input
               type="text"
               value={ticker}
-              onChange={(e) => setTicker(e.target.value)}
-              placeholder="TICKER OR INDEX NAME (AAPL, KOSPI, DAX, GOLD...)"
+              onChange={(e) => { setTicker(e.target.value); setShowDropdown(true); setHighlighted(0); }}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setShowDropdown(true)}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+              placeholder="TICKER OR NAME (AAPL, SAP.DE, VOD.L, IUIT...)"
+              autoComplete="off"
               className="w-full bg-card border-2 border-border rounded-lg py-4 pl-12 pr-4 text-lg font-mono placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase transition-all"
             />
             <button
@@ -167,6 +239,37 @@ export default function HubPage() {
             >
               ANALYZE
             </button>
+
+            {showDropdown && searchResults.length > 0 && !isPending && (
+              <div className="absolute z-20 left-0 right-0 top-[calc(100%+6px)] bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+                {searchResults.slice(0, 8).map((r: SymbolSearchResult, i: number) => (
+                  <button
+                    key={r.symbol}
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); selectResult(r.symbol); }}
+                    onMouseEnter={() => setHighlighted(i)}
+                    className={cn(
+                      "w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors",
+                      i === highlighted ? "bg-secondary/60" : "hover:bg-secondary/30"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-mono font-bold text-sm shrink-0">{r.symbol}</span>
+                      <span className="text-xs font-mono text-muted-foreground truncate">{r.name ?? ""}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase border border-border text-muted-foreground">
+                        {r.type ?? ""}
+                      </span>
+                      <span className="text-[9px] font-mono text-muted-foreground">{exchangeName(r.exchange)}</span>
+                      {r.price != null && (
+                        <span className="text-xs font-mono text-foreground">{r.price.toFixed(2)}</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
 
           <div className="flex flex-wrap gap-2 items-center">

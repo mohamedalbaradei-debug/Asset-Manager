@@ -18,15 +18,35 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Searches stocks and ETFs on NYSE, LSE, Frankfurt (Xetra), Euronext and other exchanges via Yahoo.
+ * @summary Live symbol search across all exchanges
+ */
+export const GetSymbolSearchQueryParams = zod.object({
+  "q": zod.coerce.string().describe('Search text (ticker or company name fragment)')
+})
+
+export const GetSymbolSearchResponse = zod.object({
+  "results": zod.array(zod.object({
+  "symbol": zod.string(),
+  "name": zod.string().nullish(),
+  "exchange": zod.string().nullish(),
+  "type": zod.string().nullish(),
+  "price": zod.number().nullish(),
+  "currency": zod.string().nullish()
+}))
+})
+
+
+/**
  * Returns full technical, fundamental, sentiment, options, macro, and AI analysis for a given ticker
  * @summary Analyze a stock ticker
  */
-export const analyzeStockBodyTickerMax = 10;
+export const analyzeStockBodyTickerMax = 12;
 
 
 
 export const AnalyzeStockBody = zod.object({
-  "ticker": zod.string().min(1).max(analyzeStockBodyTickerMax).describe('Stock ticker symbol (e.g. AAPL, TSLA)')
+  "ticker": zod.string().min(1).max(analyzeStockBodyTickerMax).describe('Stock ticker symbol (e.g. AAPL, TSLA, SAP.DE, VOD.L)')
 })
 
 export const AnalyzeStockResponse = zod.object({
@@ -268,11 +288,19 @@ export const GetSectorRotationResponse = zod.object({
   "change1dPct": zod.number().nullish(),
   "change1wPct": zod.number().nullish(),
   "change1mPct": zod.number().nullish(),
-  "relStrengthSpy": zod.number().nullish()
+  "relStrengthSpy": zod.number().nullish(),
+  "daily": zod.array(zod.object({
+  "date": zod.string(),
+  "retPct": zod.number().nullable()
+})).optional().describe('Cumulative % return over the last ~90 trading days, oldest first.')
 })),
   "spy": zod.object({
   "change1dPct": zod.number().nullish(),
-  "change1wPct": zod.number().nullish()
+  "change1wPct": zod.number().nullish(),
+  "daily": zod.array(zod.object({
+  "date": zod.string(),
+  "retPct": zod.number().nullable()
+})).optional().describe('Cumulative % return for SPY over the last ~90 trading days, oldest first.')
 }),
   "updatedAt": zod.string()
 })
@@ -439,7 +467,12 @@ export const GetShippingDataResponse = zod.object({
   "volumeTonnes": zod.number().nullish(),
   "vessels": zod.number().nullish(),
   "status": zod.string(),
-  "note": zod.string()
+  "note": zod.string(),
+  "series": zod.array(zod.object({
+  "date": zod.string(),
+  "volumeTonnes": zod.number().nullable(),
+  "vessels": zod.number().nullable()
+})).optional().describe('Daily transit series over the last ~year, oldest first.')
 })),
   "updatedAt": zod.string(),
   "available": zod.boolean()
@@ -502,7 +535,11 @@ export const GetMarketPulseResponse = zod.object({
   "change1dPct": zod.number().nullish(),
   "change1wPct": zod.number().nullish(),
   "change1mPct": zod.number().nullish(),
-  "relStrengthSpy": zod.number().nullish()
+  "relStrengthSpy": zod.number().nullish(),
+  "daily": zod.array(zod.object({
+  "date": zod.string(),
+  "retPct": zod.number().nullable()
+})).optional().describe('Cumulative % return over the last ~90 trading days, oldest first.')
 }).nullish(),
   "worst": zod.object({
   "symbol": zod.string(),
@@ -510,7 +547,11 @@ export const GetMarketPulseResponse = zod.object({
   "change1dPct": zod.number().nullish(),
   "change1wPct": zod.number().nullish(),
   "change1mPct": zod.number().nullish(),
-  "relStrengthSpy": zod.number().nullish()
+  "relStrengthSpy": zod.number().nullish(),
+  "daily": zod.array(zod.object({
+  "date": zod.string(),
+  "retPct": zod.number().nullable()
+})).optional().describe('Cumulative % return over the last ~90 trading days, oldest first.')
 }).nullish(),
   "spy1d": zod.number().nullish()
 }),

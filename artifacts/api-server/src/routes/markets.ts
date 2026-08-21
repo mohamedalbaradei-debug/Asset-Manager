@@ -72,7 +72,7 @@ router.get("/gex", async (req, res): Promise<void> => {
     return;
   }
   try {
-    const [spx, vix] = await Promise.all([getGexData("^GSPC"), getGexData("^VIX")]);
+    const [spx, vix] = await Promise.all([getGexData("^SPX"), getGexData("^VIX")]);
     const data = { spx, vix, updatedAt: new Date().toISOString() };
     gexCache.set(data);
     res.json(data);

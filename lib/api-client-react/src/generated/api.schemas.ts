@@ -15,11 +15,29 @@ export interface ErrorResponse {
 
 export interface AnalysisInput {
   /**
-     * Stock ticker symbol (e.g. AAPL, TSLA)
+     * Stock ticker symbol (e.g. AAPL, TSLA, SAP.DE, VOD.L)
      * @minLength 1
-     * @maxLength 10
+     * @maxLength 12
      */
   ticker: string;
+}
+
+export interface SymbolSearchResult {
+  symbol: string;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  exchange?: string | null;
+  /** @nullable */
+  type?: string | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  currency?: string | null;
+}
+
+export interface SymbolSearchData {
+  results: SymbolSearchResult[];
 }
 
 export interface HistoricalDataPoint {
@@ -330,6 +348,12 @@ export interface MoversData {
   updatedAt: string;
 }
 
+export type SectorRotationItemDailyItem = {
+  date: string;
+  /** @nullable */
+  retPct: number | null;
+};
+
 export interface SectorRotationItem {
   symbol: string;
   name: string;
@@ -341,13 +365,23 @@ export interface SectorRotationItem {
   change1mPct?: number | null;
   /** @nullable */
   relStrengthSpy?: number | null;
+  /** Cumulative % return over the last ~90 trading days, oldest first. */
+  daily?: SectorRotationItemDailyItem[];
 }
+
+export type SectorRotationDataSpyDailyItem = {
+  date: string;
+  /** @nullable */
+  retPct: number | null;
+};
 
 export type SectorRotationDataSpy = {
   /** @nullable */
   change1dPct?: number | null;
   /** @nullable */
   change1wPct?: number | null;
+  /** Cumulative % return for SPY over the last ~90 trading days, oldest first. */
+  daily?: SectorRotationDataSpyDailyItem[];
 };
 
 export interface SectorRotationData {
@@ -485,6 +519,14 @@ export interface ValuationData {
   updatedAt: string;
 }
 
+export interface ShippingPoint {
+  date: string;
+  /** @nullable */
+  volumeTonnes: number | null;
+  /** @nullable */
+  vessels: number | null;
+}
+
 export interface ShippingRow {
   chokepoint: string;
   /** @nullable */
@@ -493,6 +535,8 @@ export interface ShippingRow {
   vessels?: number | null;
   status: string;
   note: string;
+  /** Daily transit series over the last ~year, oldest first. */
+  series?: ShippingPoint[];
 }
 
 export interface ShippingData {
@@ -677,4 +721,11 @@ export interface AiChatReply {
   content?: string;
   error?: string;
 }
+
+export type GetSymbolSearchParams = {
+/**
+ * Search text (ticker or company name fragment)
+ */
+q: string;
+};
 

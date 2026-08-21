@@ -55,10 +55,26 @@ function fgColor(score: number) {
   return FG_ZONES.find((z) => score <= z.max)?.color ?? "#22c55e";
 }
 
+// VIX explanation shown directly under the numeric value.
+function vixMeaning(v: string): string {
+  const n = parseFloat(v);
+  if (isNaN(n)) return "Measures expected 30-day S&P 500 volatility. Lower = calmer markets.";
+  if (n < 15) return "Low volatility — markets calm, risk appetite high.";
+  if (n < 20) return "Normal volatility — mild investor anxiety.";
+  if (n < 30) return "Elevated volatility — noticeable fear in markets.";
+  return "High volatility — markets in panic mode.";
+}
+
 function FearGreedGauge({ data }: { data: FearGreedData }) {
   const color = fgColor(data.score);
-  // Needle angle: 0° = far left (-135°), 100 = far right (+135°)
-  const angle = -135 + (data.score / 100) * 270;
+  // Semicircle gauge: score 0 = far left (180°), score 100 = far right (0°), sweeping through top.
+  const gaugeAngle = (score: number) => 180 - (score / 100) * 180;
+  const pointAt = (angleDeg: number, len: number) => ({
+    x: 100 + len * Math.cos((angleDeg * Math.PI) / 180),
+    y: 100 - len * Math.sin((angleDeg * Math.PI) / 180),
+  });
+  const needleAngle = gaugeAngle(data.score);
+  const needleTip = pointAt(needleAngle, 62);
 
   return (
     <div className="bg-card border border-border rounded-xl p-6 space-y-4">
@@ -66,34 +82,34 @@ function FearGreedGauge({ data }: { data: FearGreedData }) {
         <h2 className="font-mono text-sm font-bold tracking-widest text-muted-foreground">
           FEAR &amp; GREED INDEX
         </h2>
-        <div className={cn("px-3 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 border", statusColor(data.status))}>
-          {statusIcon(data.status)}
-          {data.status?.toUpperCase()}
+        <div
+          className="px-3 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 border"
+          style={{ color, borderColor: `${color}55`, backgroundColor: `${color}1a` }}
+        >
+          {data.label.toUpperCase()}
         </div>
       </div>
 
       {/* Gauge SVG */}
       <div className="flex flex-col items-center gap-3">
-        <svg viewBox="0 0 200 120" className="w-56 h-auto" aria-label={`Fear & Greed: ${data.score}`}>
-          {/* Background arc segments */}
+        <svg viewBox="0 0 200 124" className="w-56 h-auto" aria-label={`Fear & Greed: ${data.score}`}>
+          {/* Colored arc segments (semicircle from left through top to right) */}
           {[
-            { start: -135, end: -81, color: "#ef4444" },
-            { start: -81,  end: -27, color: "#f97316" },
-            { start: -27,  end:   0, color: "#eab308" },
-            { start:   0,  end:  54, color: "#84cc16" },
-            { start:  54,  end: 135, color: "#22c55e" },
+            { from: 0,   to: 25,  color: "#ef4444" },
+            { from: 25,  to: 45,  color: "#f97316" },
+            { from: 45,  to: 55,  color: "#eab308" },
+            { from: 55,  to: 75,  color: "#84cc16" },
+            { from: 75,  to: 100, color: "#22c55e" },
           ].map((seg, i) => {
-            const cx = 100, cy = 105, r = 75, sw = 14;
-            const toRad = (d: number) => ((d - 90) * Math.PI) / 180;
-            const x1 = cx + r * Math.cos(toRad(seg.start));
-            const y1 = cy + r * Math.sin(toRad(seg.start));
-            const x2 = cx + r * Math.cos(toRad(seg.end));
-            const y2 = cy + r * Math.sin(toRad(seg.end));
-            const large = seg.end - seg.start > 180 ? 1 : 0;
+            const r = 75, sw = 14;
+            const a1 = gaugeAngle(seg.from);
+            const a2 = gaugeAngle(seg.to);
+            const p1 = pointAt(a1, r);
+            const p2 = pointAt(a2, r);
             return (
               <path
                 key={i}
-                d={`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`}
+                d={`M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${r} ${r} 0 0 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`}
                 fill="none"
                 stroke={seg.color}
                 strokeWidth={sw}
@@ -103,23 +119,23 @@ function FearGreedGauge({ data }: { data: FearGreedData }) {
             );
           })}
 
-          {/* Needle */}
+          {/* Needle — anchored at the arc centre (100,100), length 62 */}
           <motion.line
-            x1="100" y1="105"
-            x2="100" y2="38"
+            x1="100" y1="100"
+            x2={needleTip.x}
+            y2={needleTip.y}
             stroke={color}
-            strokeWidth="3"
+            strokeWidth="3.5"
             strokeLinecap="round"
-            style={{ transformOrigin: "100px 105px" }}
-            initial={{ rotate: -135 }}
-            animate={{ rotate: angle }}
+            initial={{ x2: pointAt(gaugeAngle(0), 62).x, y2: pointAt(gaugeAngle(0), 62).y }}
+            animate={{ x2: needleTip.x, y2: needleTip.y }}
             transition={{ type: "spring", stiffness: 60, damping: 18 }}
           />
-          <circle cx="100" cy="105" r="6" fill={color} />
-          <circle cx="100" cy="105" r="3" fill="hsl(var(--card))" />
+          <circle cx="100" cy="100" r="6" fill={color} />
+          <circle cx="100" cy="100" r="3" fill="hsl(var(--card))" />
 
           {/* Score text */}
-          <text x="100" y="92" textAnchor="middle" fontSize="20" fontWeight="bold" fill={color} fontFamily="monospace">
+          <text x="100" y="118" textAnchor="middle" fontSize="20" fontWeight="bold" fill={color} fontFamily="monospace">
             {data.score}
           </text>
         </svg>
@@ -361,11 +377,16 @@ export default function MarketPage() {
               {macroData.breadth.map((item, i) => (
                 <div
                   key={i}
-                  className="bg-card border border-border p-5 rounded-xl flex items-center justify-between"
+                  className="bg-card border border-border p-5 rounded-xl flex items-start justify-between gap-3"
                 >
                   <div>
                     <div className="text-xs text-muted-foreground font-mono mb-1">{item.label}</div>
                     <div className="font-mono text-2xl">{item.value}</div>
+                    {item.label.includes("VIX") && (
+                      <p className="text-[10px] font-mono text-muted-foreground mt-1.5 max-w-[150px] leading-snug">
+                        {vixMeaning(item.value)}
+                      </p>
+                    )}
                   </div>
                   {item.status && (
                     <div

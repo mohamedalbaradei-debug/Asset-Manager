@@ -198,15 +198,18 @@ export async function getFedData(): Promise<FedData> {
       signal: AbortSignal.timeout(12000),
     });
     if (res.ok) {
-      const json = (await res.json()) as { pd?: Array<{ value: number | string }> };
-      const vals = (json.pd ?? []).filter((x) => x.value != null && x.value !== "");
+      const json = (await res.json()) as {
+        pd?: { timeseries?: Array<{ asofdate?: string; keyid?: string; value?: number | string }> };
+      };
+      const ts = json?.pd?.timeseries ?? [];
+      const vals = ts.filter((x) => x.value != null && x.value !== "");
       const last = vals[vals.length - 1];
       if (last) {
-        const parsed = typeof last.value === "number" ? last.value : parseFloat(last.value);
+        const parsed = typeof last.value === "number" ? last.value : parseFloat(String(last.value ?? ""));
         if (!isNaN(parsed)) {
-          pdValue = parsed;
+          pdValue = parsed / 1000; // NY Fed reports $ millions -> $ billions for display
           pdNote =
-            "Primary dealers' net Treasury position (NY Fed, keyless). Positive = dealers holding (supportive); negative = dealers reducing.";
+            "Primary dealers' total U.S. Treasury positions (NY Fed, keyless). Value in $ billions. Positive = dealers holding (supportive); negative = dealers reducing.";
         }
       }
     }
@@ -333,8 +336,12 @@ async function scrapeMultpl(url: string): Promise<number | null> {
       signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return null;
-    const html = await res.text();
-    const rows = [...html.matchAll(/<tr>\s*<td>(\d{4}-\d{2}-\d{2})<\/td>\s*<td>([\d.,]+)/gi)];
+    const html = (await res.text()).replace(/&[a-zA-Z0-9#]+;/g, " ");
+    const rows = [
+      ...html.matchAll(
+        /<tr[^>]*>\s*<td>([A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})<\/td>\s*<td[^>]*>\s*([\d.,]+)/gi
+      ),
+    ];
     if (rows.length === 0) return null;
     const first = rows[0];
     return parseFloat(first[2].replace(/,/g, ""));
@@ -399,14 +406,31 @@ export async function getValuationData(): Promise<ValuationData> {
 
 // ── Shipping (IMF PortWatch) ─────────────────────────────────────────────────
 
-const PORTWATCH_CHOKEPOINTS = "https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/PortWatch_chokepoints_database/FeatureServer/0/query";
 const PORTWATCH_DAILY = "https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer/0/query";
 
 async function arcgisQuery(url: string, where = "1=1", extra = ""): Promise<unknown> {
   const u = `${url}?where=${encodeURIComponent(where)}&outFields=*&returnGeometry=false&f=json${extra}`;
-  const res = await fetch(u, { signal: AbortSignal.timeout(15000) });
+  const res = await fetch(u, { signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`ArcGIS query failed: ${res.status}`);
   return res.json();
+}
+
+async function arcgisQueryPaged(url: string, where: string, pages: number): Promise<Array<{ attributes: Record<string, unknown> }>> {
+  // ArcGIS caps resultRecordCount at 1000; page with resultOffset to cover a full year.
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      arcgisQuery(url, where, `&resultRecordCount=1000&resultOffset=${i * 1000}&orderByFields=date%20DESC`)
+    )
+  );
+  return results.flatMap(
+    (r) => (r as { features?: Array<{ attributes: Record<string, unknown> }> })?.features ?? []
+  );
+}
+
+export interface ShippingPoint {
+  date: string;
+  volumeTonnes: number | null;
+  vessels: number | null;
 }
 
 export interface ShippingRow {
@@ -415,83 +439,124 @@ export interface ShippingRow {
   vessels: number | null;
   status: "bullish" | "neutral" | "bearish";
   note: string;
+  series: ShippingPoint[];
 }
+
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+const SHIPPING_FEATURED: Array<{ name: string; aliases: string[] }> = [
+  { name: "Suez Canal", aliases: ["suez"] },
+  { name: "Panama Canal", aliases: ["panama"] },
+  { name: "Strait of Hormuz", aliases: ["hormuz"] },
+  { name: "Strait of Malacca", aliases: ["malacca"] },
+  { name: "Bab el-Mandeb", aliases: ["bab el-mandeb", "bab elmandeb"] },
+  { name: "Cape of Good Hope", aliases: ["cape of good hope"] },
+];
+
+// ArcGIS `portname` values for the featured chokepoints (used in the where IN filter).
+const SHIPPING_PORTNAMES = [
+  "Suez Canal",
+  "Panama Canal",
+  "Strait of Hormuz",
+  "Malacca Strait",
+  "Bab el-Mandeb Strait",
+  "Cape of Good Hope",
+];
 
 export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedAt: string; available: boolean }> {
   try {
-    const [ckJson, dailyJson] = await Promise.all([
-      arcgisQuery(PORTWATCH_CHOKEPOINTS),
-      arcgisQuery(PORTWATCH_DAILY, "1=1", "&resultRecordCount=500"),
-    ]);
+    const where = `portname IN (${SHIPPING_PORTNAMES.map((p) => `'${p}'`).join(",")})`;
+    const dailyFeatures = await arcgisQueryPaged(PORTWATCH_DAILY, where, 3);
 
-    const ckFeatures = (ckJson as { features?: Array<{ attributes: Record<string, unknown> }> })?.features ?? [];
-    const dailyFeatures = (dailyJson as { features?: Array<{ attributes: Record<string, unknown> }> })?.features ?? [];
-
-    // Discover attribute keys defensively
-    const findKey = (attrs: Record<string, unknown>, candidates: string[]): string | null => {
-      const keys = Object.keys(attrs);
-      for (const c of candidates) {
-        const found = keys.find((k) => k.toLowerCase().includes(c));
-        if (found) return found;
-      }
-      return null;
-    };
-
-    const chokepointNames = new Map<string, string>();
-    for (const f of ckFeatures) {
-      const a = f.attributes;
-      const nameKey = findKey(a, ["chokepointname", "name", "chokepoint"]);
-      if (nameKey) {
-        const name = String(a[nameKey]);
-        if (!chokepointNames.has(name)) chokepointNames.set(name, name);
-      }
-    }
-
-    // Group daily records by chokepoint, keep the latest per point
-    const latestByPoint = new Map<string, { volume: number | null; vessels: number | null }>();
+    // Group daily records by port (schema: portname, date, n_total, capacity)
+    const byPort = new Map<string, Array<{ date: string; capacity: number | null; vessels: number | null }>>();
     for (const f of dailyFeatures) {
       const a = f.attributes;
-      const nameKey = findKey(a, ["chokepointname", "name", "chokepoint"]);
-      if (!nameKey) continue;
-      const name = String(a[nameKey]);
-      const volumeKey = findKey(a, ["tonnage", "volume", "tons", "mass"]);
-      const vesselKey = findKey(a, ["vessel_count", "vessels", "vessel", "n_vessel"]);
-      const volume = volumeKey ? parseFloat(String(a[volumeKey])) : null;
-      const vessels = vesselKey ? parseFloat(String(a[vesselKey])) : null;
-      const current = latestByPoint.get(name) ?? { volume: null, vessels: null };
-      if (volume != null && !isNaN(volume)) current.volume = volume;
-      if (vessels != null && !isNaN(vessels)) current.vessels = vessels;
-      latestByPoint.set(name, current);
+      const name = String(a["portname"] ?? "").trim();
+      if (!name) continue;
+      const capacityRaw = a["capacity"];
+      const vesselsRaw = a["n_total"];
+      const capacity = capacityRaw != null ? parseFloat(String(capacityRaw)) : NaN;
+      const vessels = vesselsRaw != null ? parseFloat(String(vesselsRaw)) : NaN;
+      if (isNaN(capacity) && isNaN(vessels)) continue;
+      const recs = byPort.get(name) ?? [];
+      recs.push({
+        date: String(a["date"] ?? ""),
+        capacity: isNaN(capacity) ? null : capacity,
+        vessels: isNaN(vessels) ? null : vessels,
+      });
+      byPort.set(name, recs);
     }
 
-    const featured = ["Suez Canal", "Panama Canal", "Strait of Hormuz", "Strait of Malacca", "Bab el-Mandeb", "Cape of Good Hope"];
     const rows: ShippingRow[] = [];
+    for (const featured of SHIPPING_FEATURED) {
+      const match = [...byPort.keys()].find((name) => {
+        const norm = normalizeName(name);
+        return featured.aliases.some(
+          (al) => norm.includes(normalizeName(al)) || normalizeName(al).includes(norm)
+        );
+      });
+      const recs = match ? (byPort.get(match) ?? []) : [];
 
-    for (const featuredName of featured) {
-      const match = chokepointNames.size > 0
-        ? [...chokepointNames.values()].find((n) => n.toLowerCase().includes(featuredName.split(" ")[0].toLowerCase()))
-        : featuredName;
-      const key = match ?? featuredName;
-      const data = latestByPoint.get(key) ?? (featured.length === 0 ? latestByPoint.get(featuredName) : undefined);
-      const volume = data?.volume ?? null;
-      const vessels = data?.vessels ?? null;
-
+      let volume: number | null = null;
+      let vessels: number | null = null;
+      let dataDate: string | null = null;
       let status: ShippingRow["status"] = "neutral";
       let note: string;
-      if (volume == null) {
+      let series: ShippingPoint[] = [];
+
+      if (recs.length === 0) {
         note = "No transit data available for this chokepoint.";
       } else {
-        status = volume > 1_000_000_000 ? "bullish" : volume < 500_000_000 ? "bearish" : "neutral";
-        note = `${(volume / 1e6).toFixed(0)}M tonnes transiting recently — ${status === "bullish" ? "strong trade flows (supportive for global growth)" : status === "bearish" ? "reduced flows (trade disruption risk)" : "normal activity"}.`;
+        const sorted = [...recs].sort((x, y) => x.date.localeCompare(y.date));
+        const latest = sorted[sorted.length - 1];
+        volume = latest.capacity;
+        vessels = latest.vessels;
+        dataDate = latest.date || null;
+
+        series = sorted.map((r) => ({
+          date: r.date,
+          volumeTonnes: r.capacity,
+          vessels: r.vessels,
+        }));
+
+        const history = sorted.slice(0, -1);
+        const baselineWindow = history.slice(-90);
+        const valid = baselineWindow.filter((r) => r.capacity != null).map((r) => r.capacity as number);
+        const baseline = valid.length > 0 ? valid.reduce((s, v) => s + v, 0) / valid.length : null;
+
+        if (volume == null) {
+          note = `Vessel transits recorded (${vessels ?? "n/a"} ships/day) — no tonnage figure available.`;
+        } else {
+          const vs = baseline != null && baseline > 0 ? ((volume - baseline) / baseline) * 100 : 0;
+          status = vs > 20 ? "bullish" : vs < -20 ? "bearish" : "neutral";
+          const pct = baseline != null ? ` (${vs > 0 ? "+" : ""}${vs.toFixed(0)}% vs recent baseline)` : "";
+          note = `${(volume / 1e6).toFixed(0)}M tonnes/day${pct}. ${
+            status === "bullish"
+              ? "Strong trade flows (supportive for global growth)."
+              : status === "bearish"
+                ? "Reduced flows (trade disruption risk)."
+                : "Normal activity."
+          }`;
+        }
       }
 
-      rows.push({ chokepoint: featuredName, volumeTonnes: volume, vessels, status, note });
+      rows.push({
+        chokepoint: featured.name,
+        volumeTonnes: volume,
+        vessels,
+        status,
+        note: dataDate ? `${note} Data as of ${dataDate}.` : note,
+        series,
+      });
     }
 
     return {
       rows,
       updatedAt: new Date().toISOString(),
-      available: rows.some((r) => r.volumeTonnes != null),
+      available: rows.some((r) => r.volumeTonnes != null || r.vessels != null),
     };
   } catch (err) {
     logger.warn({ err }, "Shipping data unavailable");

@@ -8,9 +8,9 @@
 
 export interface AnalysisInput {
   /**
-     * Stock ticker symbol (e.g. AAPL, TSLA)
+     * Stock ticker symbol (e.g. AAPL, TSLA, SAP.DE, VOD.L)
      * @minLength 1
-     * @maxLength 10
+     * @maxLength 12
      */
   ticker: string;
 }

@@ -98,6 +98,21 @@ async function dailyCloses(symbol: string, days: number): Promise<number[]> {
   }
 }
 
+async function dailySeries(symbol: string, days: number): Promise<Array<{ date: string; close: number }>> {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const result = await yahooFinance.chart(symbol, { period1: since, interval: "1d" });
+    const quotes = (result.quotes ?? []) as Array<{ date?: Date | null; close?: number | null }>;
+    return quotes
+      .filter((q) => q.close != null && q.date != null)
+      .map((q) => ({ date: (q.date as Date).toISOString().slice(0, 10), close: q.close as number }));
+  } catch (err) {
+    logger.warn({ err, symbol }, "Chart series fetch failed for sector");
+    return [];
+  }
+}
+
 function pctChange(closes: number[], lookback: number): number | null {
   if (closes.length < lookback + 1) return null;
   const start = closes[closes.length - 1 - lookback];
@@ -113,19 +128,25 @@ export interface SectorRotationItem {
   change1wPct: number | null;
   change1mPct: number | null;
   relStrengthSpy: number | null; // 1w return minus SPY 1w return
+  daily: Array<{ date: string; retPct: number | null }>; // cumulative % return, last ~90 trading days
 }
 
 export async function getSectorRotation(): Promise<{
   sectors: SectorRotationItem[];
-  spy: { change1dPct: number | null; change1wPct: number | null };
+  spy: { change1dPct: number | null; change1wPct: number | null; daily: Array<{ date: string; retPct: number | null }> };
   updatedAt: string;
 }> {
   const allSymbols = [...SECTOR_ETFS.map((s) => s.symbol), "SPY"];
   const closesMap = new Map<string, number[]>();
+  const seriesMap = new Map<string, Array<{ date: string; close: number }>>();
 
   const results = await Promise.allSettled(allSymbols.map((s) => dailyCloses(s, 300)));
   results.forEach((r, i) => {
     closesMap.set(allSymbols[i], r.status === "fulfilled" ? r.value : []);
+  });
+  const seriesResults = await Promise.allSettled(allSymbols.map((s) => dailySeries(s, 300)));
+  seriesResults.forEach((r, i) => {
+    seriesMap.set(allSymbols[i], r.status === "fulfilled" ? r.value : []);
   });
 
   const spyCloses = closesMap.get("SPY") ?? [];
@@ -134,6 +155,15 @@ export async function getSectorRotation(): Promise<{
   const sectors: SectorRotationItem[] = SECTOR_ETFS.map((s) => {
     const closes = closesMap.get(s.symbol) ?? [];
     const change1wPct = pctChange(closes, 5);
+
+    const raw = seriesMap.get(s.symbol) ?? [];
+    const window = raw.slice(-90);
+    const first = window.find((p) => p.close != null);
+    const daily = window.map((p) => ({
+      date: p.date,
+      retPct: first != null && first.close !== 0 ? ((p.close - first.close) / first.close) * 100 : null,
+    }));
+
     return {
       symbol: s.symbol,
       name: s.name,
@@ -142,12 +172,25 @@ export async function getSectorRotation(): Promise<{
       change1mPct: pctChange(closes, 21),
       relStrengthSpy:
         change1wPct != null && spy1w != null ? change1wPct - spy1w : null,
+      daily,
     };
   });
 
+  const spyRaw = seriesMap.get("SPY") ?? [];
+  const spyWindow = spyRaw.slice(-90);
+  const spyFirst = spyWindow.find((p) => p.close != null);
+  const spyDaily = spyWindow.map((p) => ({
+    date: p.date,
+    retPct: spyFirst != null && spyFirst.close !== 0 ? ((p.close - spyFirst.close) / spyFirst.close) * 100 : null,
+  }));
+
   return {
     sectors,
-    spy: { change1dPct: pctChange(spyCloses, 1), change1wPct: spy1w },
+    spy: {
+      change1dPct: pctChange(spyCloses, 1),
+      change1wPct: spy1w,
+      daily: spyDaily,
+    },
     updatedAt: new Date().toISOString(),
   };
 }

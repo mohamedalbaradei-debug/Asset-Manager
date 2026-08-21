@@ -35,6 +35,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  /search:
+    get:
+      operationId: getSymbolSearch
+      tags: [analysis]
+      summary: Live symbol search across all exchanges
+      description: Searches stocks and ETFs on NYSE, LSE, Frankfurt (Xetra), Euronext and other exchanges via Yahoo.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search text (ticker or company name fragment)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching symbols
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SymbolSearchData"
+
   /analyze:
     post:
       operationId: analyzeStock
@@ -402,11 +423,39 @@ components:
       properties:
         ticker:
           type: string
-          description: Stock ticker symbol (e.g. AAPL, TSLA)
+          description: Stock ticker symbol (e.g. AAPL, TSLA, SAP.DE, VOD.L)
           minLength: 1
-          maxLength: 10
+          maxLength: 12
       required:
         - ticker
+
+    SymbolSearchResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: ["string", "null"]
+        exchange:
+          type: ["string", "null"]
+        type:
+          type: ["string", "null"]
+        price:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+      required:
+        - symbol
+
+    SymbolSearchData:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SymbolSearchResult"
+      required:
+        - results
 
     HistoricalDataPoint:
       type: object
@@ -972,6 +1021,19 @@ components:
           type: ["number", "null"]
         relStrengthSpy:
           type: ["number", "null"]
+        daily:
+          type: array
+          description: Cumulative % return over the last ~90 trading days, oldest first.
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              retPct:
+                type: ["number", "null"]
+            required:
+              - date
+              - retPct
       required:
         - symbol
         - name
@@ -990,6 +1052,19 @@ components:
               type: ["number", "null"]
             change1wPct:
               type: ["number", "null"]
+            daily:
+              type: array
+              description: Cumulative % return for SPY over the last ~90 trading days, oldest first.
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  retPct:
+                    type: ["number", "null"]
+                required:
+                  - date
+                  - retPct
         updatedAt:
           type: string
       required:
@@ -1244,10 +1319,29 @@ components:
           type: string
         note:
           type: string
+        series:
+          type: array
+          description: Daily transit series over the last ~year, oldest first.
+          items:
+            $ref: "#/components/schemas/ShippingPoint"
       required:
         - chokepoint
         - status
         - note
+
+    ShippingPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        volumeTonnes:
+          type: ["number", "null"]
+        vessels:
+          type: ["number", "null"]
+      required:
+        - date
+        - volumeTonnes
+        - vessels
 
     ShippingData:
       type: object
