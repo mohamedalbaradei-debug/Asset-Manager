@@ -587,7 +587,7 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   }
 
   // Fetch ticker and SPY history in parallel
-  const [histResult, spyHistory, ohlcResult0, tvResult, summary, searchResult] = await Promise.allSettled([
+  const [histResult, spyHistory, ohlcResult0, tvResult, summary, searchResult, statsSettled] = await Promise.allSettled([
     Promise.resolve(history),
     fetchHistory("SPY", "6mo"),
     fetchOhlc1y(ticker),
@@ -596,6 +596,9 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
       modules: ["price", "summaryDetail", "defaultKeyStatistics", "financialData", "earnings"],
     }),
     yahooFinance.search(ticker, { newsCount: 5 }),
+    // Chart meta works on datacenter IPs where quoteSummary is blocked;
+    // supplies the company name when the quoteSummary call fails.
+    import("./stockDetail").then((m) => m.fetchQuoteStats(ticker)),
   ]);
 
   const hist = histResult.status === "fulfilled" ? histResult.value : [];
@@ -608,6 +611,10 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
   const ohlc1y = ohlcResult.candles;
   const sum = summary.status === "fulfilled" ? summary.value : null;
   const searchRes = searchResult.status === "fulfilled" ? searchResult.value : null;
+  const quoteStats =
+    statsSettled.status === "fulfilled"
+      ? (statsSettled.value as Awaited<ReturnType<typeof import("./stockDetail").fetchQuoteStats>>)
+      : null;
 
   const closes = hist.map((h) => h.close);
   const spyCloses = spyHist.map((h) => h.close);
@@ -676,7 +683,11 @@ export async function analyzeStock(tickerRaw: string): Promise<AnalysisResult> {
     ohlc1y.length > 0 ? Math.max(...ohlc1y.map((c) => c.high)) : (summaryDetail?.fiftyTwoWeekHigh as number | undefined) ?? null;
   const fiftyTwoWeekLow: number | null =
     ohlc1y.length > 0 ? Math.min(...ohlc1y.map((c) => c.low)) : (summaryDetail?.fiftyTwoWeekLow as number | undefined) ?? null;
-  const companyName: string | null = (price?.longName as string | undefined) ?? (price?.shortName as string | undefined) ?? null;
+  const companyName: string | null =
+    (price?.longName as string | undefined) ??
+    (price?.shortName as string | undefined) ??
+    quoteStats?.name ??
+    null;
 
   // ── Fair value (analyst consensus) ────────────────────────────────────────
   const financialData = sum?.financialData as

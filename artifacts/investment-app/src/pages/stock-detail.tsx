@@ -3,8 +3,10 @@ import { useParams, useLocation } from "wouter";
 import {
   useGetStockDetail,
   useGetStockHistory,
+  useGetStockInsiders,
   type HistoryData,
   type GetStockHistoryInterval,
+  type InsiderTrade,
 } from "@workspace/api-client-react";
 import { SectionHeader, LoadingState, ErrorState, DataTile, Card } from "@/components/panels";
 import { cn } from "@/lib/utils";
@@ -174,6 +176,9 @@ export default function StockDetailPage() {
   useEffect(() => setInput(routeSymbol), [routeSymbol]);
 
   const { data: d, isPending, isError } = useGetStockDetail(routeSymbol);
+  const { data: insiders } = useGetStockInsiders(routeSymbol, {
+    query: { queryKey: ["getStockInsiders", routeSymbol] },
+  });
 
   if (isPending)
     return (
@@ -388,6 +393,49 @@ export default function StockDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Insider activity */}
+      {insiders && insiders.trades.length > 0 && (
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
+              Insider Activity — SEC Form 4
+            </h2>
+            {insiders.netBuyValueUsd != null && (
+              <span className={cn("font-mono text-sm font-bold", insiders.netBuyValueUsd >= 0 ? "text-green-500" : "text-destructive")}>
+                Net {insiders.netBuyValueUsd >= 0 ? "buying" : "selling"} ${fmtCompact(Math.abs(insiders.netBuyValueUsd))}
+              </span>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-border">
+                  {["FILED", "TRADED", "INSIDER", "ROLE", "ACTION", "SHARES", "PRICE", "VALUE"].map((h) => (
+                    <th key={h} className="px-3 py-2 text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {insiders.trades.map((t: InsiderTrade, i: number) => (
+                  <tr key={i} className="border-b border-border/50 last:border-0 hover:bg-muted/40">
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{t.filedAt}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{t.date ?? "—"}</td>
+                    <td className="px-3 py-2 text-sm">{t.insider.length > 28 ? `${t.insider.slice(0, 26)}…` : t.insider}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground max-w-[180px] truncate" title={t.role ?? ""}>{t.role ?? "—"}</td>
+                    <td className={cn("px-3 py-2 font-mono text-xs font-bold uppercase", t.action === "buy" ? "text-green-500" : t.action === "sell" ? "text-destructive" : "text-muted-foreground")}>
+                      {t.action}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs text-right">{t.shares != null ? fmtNum(t.shares) : "—"}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-right">{t.price != null ? `$${fmtNum(t.price)}` : "—"}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-right">{t.valueUsd != null ? `$${fmtCompact(t.valueUsd)}` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

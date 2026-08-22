@@ -2,6 +2,8 @@ import React from "react";
 import {
   useGetShippingData,
   getGetShippingDataQueryKey,
+  useGetChokepoints,
+  type ChokepointRow,
   type ShippingRow,
 } from "@workspace/api-client-react";
 import {
@@ -86,6 +88,9 @@ export default function ShippingPage() {
   const { data, isPending, isError } = useGetShippingData({
     query: { queryKey: getGetShippingDataQueryKey() },
   });
+  const { data: daily } = useGetChokepoints({
+    query: { queryKey: ["getChokepoints"] },
+  });
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -124,6 +129,37 @@ export default function ShippingPage() {
                 <p className="text-[10px] font-mono text-muted-foreground leading-relaxed border-t border-border pt-3">{r.note}</p>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+      {daily && daily.chokepoints.length > 0 && (
+        <section>
+          <SectionTitle>DAILY VESSEL TRANSITS — LATEST DAY ({daily.date ?? "?"})</SectionTitle>
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-border">
+                  {["CHOKEPOINT", "TOTAL", "TANKER", "CONTAINER", "DRY BULK", "CARGO", "RORO"].map((h) => (
+                    <th key={h} className="px-4 py-2.5 text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...daily.chokepoints]
+                  .sort((a, b) => (b.totalTransits ?? 0) - (a.totalTransits ?? 0))
+                  .map((c: ChokepointRow) => (
+                  <tr key={c.id} className="border-b border-border/50 last:border-0 hover:bg-muted/40">
+                    <td className="px-4 py-2.5 font-mono text-sm">{c.name}</td>
+                    <td className="px-4 py-2.5 font-mono text-sm font-bold">{c.totalTransits ?? "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{c.tanker ?? "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{c.container ?? "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{c.dryBulk ?? "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{c.cargo ?? "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{c.roro ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       )}

@@ -127,7 +127,7 @@ function sma(values: number[], n: number): number | null {
   return sum / n;
 }
 
-async function fetchQuoteStats(symbol: string): Promise<QuoteStats> {
+export async function fetchQuoteStats(symbol: string): Promise<QuoteStats> {
   const since = new Date();
   since.setFullYear(since.getFullYear() - 5);
 
@@ -176,20 +176,13 @@ const SEC_HEADERS = {
   Accept: "application/json",
 };
 
-interface SecEntry {
-  start?: string;
-  end: string;
-  val: number;
-  form?: string;
-  filed?: string;
-}
-
-type SecConcepts = Record<string, { units?: Record<string, SecEntry[]> }>;
-type SecFacts = { entityName?: string; facts?: { "us-gaap"?: SecConcepts } };
+export type SecConcepts = Record<string, { units?: Record<string, SecEntry[]> }>;
+export type SecFacts = { entityName?: string; facts?: { "us-gaap"?: SecConcepts } };
+export type SecEntry = { start?: string; end: string; val: number; form?: string; filed?: string };
 
 let tickerMapCache: { t: number; m: Map<string, { cik: number; title: string }> } | null = null;
 
-async function secTickerMap(): Promise<Map<string, { cik: number; title: string }>> {
+export async function secTickerMap(): Promise<Map<string, { cik: number; title: string }>> {
   if (tickerMapCache && Date.now() - tickerMapCache.t < 7 * 24 * 3600_000) {
     return tickerMapCache.m;
   }
@@ -207,7 +200,7 @@ async function secTickerMap(): Promise<Map<string, { cik: number; title: string 
 
 const factsCache = new Map<string, { t: number; facts: SecFacts }>();
 
-async function secCompanyFacts(cik: number): Promise<SecFacts> {
+export async function secCompanyFacts(cik: number): Promise<SecFacts> {
   const key = String(cik);
   const hit = factsCache.get(key);
   if (hit && Date.now() - hit.t < 24 * 3600_000) return hit.facts;

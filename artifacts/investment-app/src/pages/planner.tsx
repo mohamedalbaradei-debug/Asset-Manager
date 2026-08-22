@@ -1,13 +1,94 @@
 import { useState } from "react";
 import {
   useCreateInvestmentPlan,
+  useBacktestPlan,
   type PlanRequest,
   type PlanResponse,
 } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 import { Calculator, TrendingUp, Shield, Coins, ListChecks, CircleAlert } from "lucide-react";
 import { SectionHeader } from "@/components/panels";
 import { cn } from "@/lib/utils";
+
+function BacktestCard({ horizon, risk }: { horizon: PlanRequest["horizon"]; risk: PlanRequest["riskTolerance"] }) {
+  const bt = useBacktestPlan();
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-card border border-border rounded-xl p-6 space-y-4"
+    >
+      <div className="flex items-center justify-between">
+        <h2 className="font-mono text-sm font-bold uppercase tracking-wide flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-primary" />
+          Historical Backtest vs SPY
+        </h2>
+        <button
+          onClick={() => bt.mutate({ data: { horizon, riskTolerance: risk } })}
+          disabled={bt.isPending}
+          className={cn(
+            "px-4 py-1.5 rounded-lg font-mono text-xs font-bold transition-colors",
+            bt.isPending ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground hover:opacity-90",
+          )}
+        >
+          {bt.isPending ? "RUNNING…" : "RUN BACKTEST"}
+        </button>
+      </div>
+
+      {bt.isError && (
+        <p className="text-[11px] font-mono text-destructive">Backtest failed — try again.</p>
+      )}
+
+      {bt.data && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[
+              ["CAGR", bt.data.cagrPct != null ? `${bt.data.cagrPct.toFixed(1)}%` : "—"],
+              ["SPY CAGR", bt.data.spyCagrPct != null ? `${bt.data.spyCagrPct.toFixed(1)}%` : "—"],
+              ["VOL (ANN.)", bt.data.volPct != null ? `${bt.data.volPct.toFixed(1)}%` : "—"],
+              ["MAX DRAWDOWN", bt.data.maxDrawdownPct != null ? `${bt.data.maxDrawdownPct.toFixed(1)}%` : "—"],
+              ["$10K GREW TO", bt.data.growthOf10kUsd != null ? `$${new Intl.NumberFormat("en-US").format(bt.data.growthOf10kUsd)}` : "—"],
+            ].map(([label, value]) => (
+              <div key={label} className="border border-border rounded-lg p-3">
+                <div className="text-[10px] font-mono text-muted-foreground uppercase">{label}</div>
+                <div className="font-mono text-base font-bold mt-0.5">{value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="h-[240px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={bt.data.points} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={9} tickLine={false} axisLine={false} minTickGap={60} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={9} tickLine={false} axisLine={false} width={40} domain={["auto", "auto"]} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                  itemStyle={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}
+                  labelStyle={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "hsl(var(--muted-foreground))" }}
+                />
+                <Line type="monotone" dataKey="portfolio" stroke="#22c55e" strokeWidth={1.8} dot={false} name="Portfolio" />
+                <Line type="monotone" dataKey="spy" stroke="#71717a" strokeWidth={1.2} dot={false} name="SPY" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">{bt.data.disclaimer}</p>
+        </div>
+      )}
+    </motion.section>
+  );
+}
 
 const HORIZONS: Array<{ value: PlanRequest["horizon"]; label: string; hint: string }> = [
   { value: "short", label: "Short", hint: "up to 3 years" },
@@ -287,6 +368,8 @@ export default function PlannerPage() {
           </motion.section>
         </>
       )}
+
+      <BacktestCard horizon={horizon} risk={risk} />
     </div>
   );
 }

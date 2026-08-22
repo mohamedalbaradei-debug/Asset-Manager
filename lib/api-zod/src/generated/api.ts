@@ -675,6 +675,200 @@ export const GetStockHistoryResponse = zod.object({
 
 
 /**
+ * @summary Recent SEC Form 4 insider transactions
+ */
+export const GetStockInsidersParams = zod.object({
+  "symbol": zod.coerce.string()
+})
+
+export const GetStockInsidersResponse = zod.object({
+  "symbol": zod.string(),
+  "issuer": zod.string().nullish(),
+  "trades": zod.array(zod.object({
+  "date": zod.coerce.date().nullish().describe('Transaction date from the Form 4 XML'),
+  "filedAt": zod.coerce.date(),
+  "insider": zod.string(),
+  "role": zod.string().nullish(),
+  "action": zod.enum(['buy', 'sell', 'option', 'gift', 'award', 'other']),
+  "code": zod.string(),
+  "shares": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "valueUsd": zod.number().nullish(),
+  "afterOwnship": zod.number().nullish()
+})),
+  "netBuyValueUsd": zod.number().nullish(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary IMF PortWatch daily chokepoint transits
+ */
+export const GetChokepointsResponse = zod.object({
+  "chokepoints": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "date": zod.coerce.date(),
+  "cargo": zod.number().nullish(),
+  "container": zod.number().nullish(),
+  "dryBulk": zod.number().nullish(),
+  "generalCargo": zod.number().nullish(),
+  "roro": zod.number().nullish(),
+  "tanker": zod.number().nullish(),
+  "totalTransits": zod.number().nullish()
+})),
+  "date": zod.coerce.date().nullish(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary EIA Weekly Petroleum Status Report stocks
+ */
+export const GetPetroleumStatusResponse = zod.object({
+  "available": zod.boolean(),
+  "note": zod.string().nullish(),
+  "weekEnding": zod.coerce.date().nullish(),
+  "prevWeekEnding": zod.coerce.date().nullish(),
+  "stocks": zod.array(zod.object({
+  "label": zod.string(),
+  "latest": zod.number().nullish(),
+  "prevWeek": zod.number().nullish(),
+  "yearAgo": zod.number().nullish(),
+  "changeWow": zod.number().nullish(),
+  "changeYoy": zod.number().nullish()
+})).optional(),
+  "domesticProductionKbd": zod.number().nullish(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Deribit crypto options chains and futures term structure
+ */
+export const getCryptoOptionsQueryCurrencyDefault = `BTC`;
+
+export const GetCryptoOptionsQueryParams = zod.object({
+  "currency": zod.enum(['BTC', 'ETH']).default(getCryptoOptionsQueryCurrencyDefault)
+})
+
+export const GetCryptoOptionsResponse = zod.object({
+  "currency": zod.string(),
+  "spot": zod.number().nullish(),
+  "expiries": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "daysToExpiry": zod.number(),
+  "strikes": zod.array(zod.object({
+  "strike": zod.number().optional(),
+  "callOi": zod.number().nullish(),
+  "putOi": zod.number().nullish(),
+  "callMark": zod.number().nullish(),
+  "putMark": zod.number().nullish()
+})),
+  "totalCallOi": zod.number().optional(),
+  "totalPutOi": zod.number().optional(),
+  "putCallRatio": zod.number().nullish(),
+  "maxPain": zod.number().nullish()
+})),
+  "futures": zod.array(zod.object({
+  "instrument": zod.string(),
+  "maturityDate": zod.coerce.date().nullish(),
+  "markPrice": zod.number().nullish(),
+  "lastPrice": zod.number().nullish(),
+  "openInterest": zod.number().nullish(),
+  "annualizedPct": zod.number().nullish()
+})),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Searchable news archive collected from the live feed
+ */
+export const queryNewsArchiveQueryLimitDefault = 100;
+
+export const QueryNewsArchiveQueryParams = zod.object({
+  "ticker": zod.coerce.string().optional(),
+  "from": zod.date().optional(),
+  "to": zod.date().optional(),
+  "limit": zod.coerce.number().default(queryNewsArchiveQueryLimitDefault)
+})
+
+export const QueryNewsArchiveResponse = zod.object({
+  "articles": zod.array(zod.object({
+  "ticker": zod.string().optional(),
+  "title": zod.string().optional(),
+  "url": zod.string().nullish(),
+  "source": zod.string().optional(),
+  "publishedAt": zod.string().nullish(),
+  "sentiment": zod.string().optional()
+})),
+  "total": zod.number(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Event study over archived headlines for a ticker
+ */
+export const getNewsEventStudyQueryWindowDefault = 2;
+export const getNewsEventStudyQueryWindowMax = 10;
+
+
+
+export const GetNewsEventStudyQueryParams = zod.object({
+  "ticker": zod.coerce.string(),
+  "window": zod.coerce.number().min(1).max(getNewsEventStudyQueryWindowMax).default(getNewsEventStudyQueryWindowDefault).describe('Trading sessions ahead used to measure the post-headline return.')
+})
+
+export const GetNewsEventStudyResponse = zod.object({
+  "ticker": zod.string(),
+  "windowDays": zod.number(),
+  "events": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "headlines": zod.number(),
+  "retPct": zod.number().nullish(),
+  "spyRetPct": zod.number().nullish(),
+  "excessPct": zod.number().nullish()
+})),
+  "avgExcessPct": zod.number().nullish(),
+  "positiveEvents": zod.number(),
+  "negativeEvents": zod.number()
+})
+
+
+/**
+ * @summary Historical backtest of a planner allocation vs SPY
+ */
+export const backtestPlanBodyHorizonDefault = `medium`;
+export const backtestPlanBodyRiskToleranceDefault = `balanced`;
+
+export const BacktestPlanBody = zod.object({
+  "horizon": zod.enum(['short', 'medium', 'long']).default(backtestPlanBodyHorizonDefault),
+  "riskTolerance": zod.enum(['conservative', 'balanced', 'aggressive']).default(backtestPlanBodyRiskToleranceDefault)
+})
+
+export const BacktestPlanResponse = zod.object({
+  "etfs": zod.array(zod.object({
+  "ticker": zod.string().optional(),
+  "percentOfPortfolio": zod.number().optional()
+})),
+  "months": zod.number(),
+  "points": zod.array(zod.object({
+  "date": zod.string(),
+  "portfolio": zod.number(),
+  "spy": zod.number().nullish()
+})),
+  "cagrPct": zod.number().nullish(),
+  "spyCagrPct": zod.number().nullish(),
+  "volPct": zod.number().nullish(),
+  "maxDrawdownPct": zod.number().nullish(),
+  "growthOf10kUsd": zod.number().nullish(),
+  "disclaimer": zod.string()
+})
+
+
+/**
  * @summary Combined market pulse board
  */
 export const GetMarketPulseResponse = zod.object({

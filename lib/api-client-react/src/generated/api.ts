@@ -25,25 +25,36 @@ import type {
   AiStatus,
   AnalysisInput,
   AnalysisResult,
+  BacktestPlanBody,
+  BacktestResult,
   CalendarData,
+  ChokepointsData,
+  CryptoOptionsData,
   ErrorResponse,
   EtfTrackerData,
+  EventStudyResult,
   FedData,
   FullUsMacro,
   FxData,
+  GetCryptoOptionsParams,
+  GetNewsEventStudyParams,
   GetStockHistoryParams,
   GetSymbolSearchParams,
   GexResponse,
   GlobalMacro,
   HealthStatus,
   HistoryData,
+  InsidersData,
   MacroMarketData,
   MarketPulse,
   MoversData,
+  NewsArchiveResult,
   NewsData,
   PerformanceData,
+  PetroleumData,
   PlanRequest,
   PlanResponse,
+  QueryNewsArchiveParams,
   SectorRotationData,
   ShippingData,
   SpyQqqRotation,
@@ -1567,6 +1578,560 @@ export function useGetStockHistory<TData = Awaited<ReturnType<typeof getStockHis
 
 
 
+
+export const getGetStockInsidersUrl = (symbol: string,) => {
+
+
+
+
+  return `/api/stocks/${symbol}/insiders`
+}
+
+/**
+ * @summary Recent SEC Form 4 insider transactions
+ */
+export const getStockInsiders = async (symbol: string, options?: RequestInit): Promise<InsidersData> => {
+
+  return customFetch<InsidersData>(getGetStockInsidersUrl(symbol),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStockInsidersQueryKey = (symbol: string,) => {
+    return [
+    `/api/stocks/${symbol}/insiders`
+    ] as const;
+    }
+
+
+export const getGetStockInsidersQueryOptions = <TData = Awaited<ReturnType<typeof getStockInsiders>>, TError = ErrorType<unknown>>(symbol: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStockInsiders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStockInsidersQueryKey(symbol);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStockInsiders>>> = ({ signal }) => getStockInsiders(symbol, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: symbol !== null && symbol !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStockInsiders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStockInsidersQueryResult = NonNullable<Awaited<ReturnType<typeof getStockInsiders>>>
+export type GetStockInsidersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Recent SEC Form 4 insider transactions
+ */
+
+export function useGetStockInsiders<TData = Awaited<ReturnType<typeof getStockInsiders>>, TError = ErrorType<unknown>>(
+ symbol: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStockInsiders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStockInsidersQueryOptions(symbol,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetChokepointsUrl = () => {
+
+
+
+
+  return `/api/shipping/chokepoints`
+}
+
+/**
+ * @summary IMF PortWatch daily chokepoint transits
+ */
+export const getChokepoints = async ( options?: RequestInit): Promise<ChokepointsData> => {
+
+  return customFetch<ChokepointsData>(getGetChokepointsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChokepointsQueryKey = () => {
+    return [
+    `/api/shipping/chokepoints`
+    ] as const;
+    }
+
+
+export const getGetChokepointsQueryOptions = <TData = Awaited<ReturnType<typeof getChokepoints>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChokepoints>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChokepointsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChokepoints>>> = ({ signal }) => getChokepoints({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChokepoints>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChokepointsQueryResult = NonNullable<Awaited<ReturnType<typeof getChokepoints>>>
+export type GetChokepointsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary IMF PortWatch daily chokepoint transits
+ */
+
+export function useGetChokepoints<TData = Awaited<ReturnType<typeof getChokepoints>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChokepoints>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChokepointsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPetroleumStatusUrl = () => {
+
+
+
+
+  return `/api/petroleum`
+}
+
+/**
+ * @summary EIA Weekly Petroleum Status Report stocks
+ */
+export const getPetroleumStatus = async ( options?: RequestInit): Promise<PetroleumData> => {
+
+  return customFetch<PetroleumData>(getGetPetroleumStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPetroleumStatusQueryKey = () => {
+    return [
+    `/api/petroleum`
+    ] as const;
+    }
+
+
+export const getGetPetroleumStatusQueryOptions = <TData = Awaited<ReturnType<typeof getPetroleumStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPetroleumStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPetroleumStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPetroleumStatus>>> = ({ signal }) => getPetroleumStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPetroleumStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPetroleumStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getPetroleumStatus>>>
+export type GetPetroleumStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary EIA Weekly Petroleum Status Report stocks
+ */
+
+export function useGetPetroleumStatus<TData = Awaited<ReturnType<typeof getPetroleumStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPetroleumStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPetroleumStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCryptoOptionsUrl = (params?: GetCryptoOptionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/crypto/options?${stringifiedParams}` : `/api/crypto/options`
+}
+
+/**
+ * @summary Deribit crypto options chains and futures term structure
+ */
+export const getCryptoOptions = async (params?: GetCryptoOptionsParams, options?: RequestInit): Promise<CryptoOptionsData> => {
+
+  return customFetch<CryptoOptionsData>(getGetCryptoOptionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCryptoOptionsQueryKey = (params?: GetCryptoOptionsParams,) => {
+    return [
+    `/api/crypto/options`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCryptoOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getCryptoOptions>>, TError = ErrorType<unknown>>(params?: GetCryptoOptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCryptoOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCryptoOptionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCryptoOptions>>> = ({ signal }) => getCryptoOptions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCryptoOptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCryptoOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof getCryptoOptions>>>
+export type GetCryptoOptionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Deribit crypto options chains and futures term structure
+ */
+
+export function useGetCryptoOptions<TData = Awaited<ReturnType<typeof getCryptoOptions>>, TError = ErrorType<unknown>>(
+ params?: GetCryptoOptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCryptoOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCryptoOptionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getQueryNewsArchiveUrl = (params?: QueryNewsArchiveParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/news/archive?${stringifiedParams}` : `/api/news/archive`
+}
+
+/**
+ * @summary Searchable news archive collected from the live feed
+ */
+export const queryNewsArchive = async (params?: QueryNewsArchiveParams, options?: RequestInit): Promise<NewsArchiveResult> => {
+
+  return customFetch<NewsArchiveResult>(getQueryNewsArchiveUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getQueryNewsArchiveQueryKey = (params?: QueryNewsArchiveParams,) => {
+    return [
+    `/api/news/archive`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getQueryNewsArchiveQueryOptions = <TData = Awaited<ReturnType<typeof queryNewsArchive>>, TError = ErrorType<unknown>>(params?: QueryNewsArchiveParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof queryNewsArchive>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getQueryNewsArchiveQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof queryNewsArchive>>> = ({ signal }) => queryNewsArchive(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof queryNewsArchive>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type QueryNewsArchiveQueryResult = NonNullable<Awaited<ReturnType<typeof queryNewsArchive>>>
+export type QueryNewsArchiveQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Searchable news archive collected from the live feed
+ */
+
+export function useQueryNewsArchive<TData = Awaited<ReturnType<typeof queryNewsArchive>>, TError = ErrorType<unknown>>(
+ params?: QueryNewsArchiveParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof queryNewsArchive>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getQueryNewsArchiveQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetNewsEventStudyUrl = (params: GetNewsEventStudyParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/news/events?${stringifiedParams}` : `/api/news/events`
+}
+
+/**
+ * @summary Event study over archived headlines for a ticker
+ */
+export const getNewsEventStudy = async (params: GetNewsEventStudyParams, options?: RequestInit): Promise<EventStudyResult> => {
+
+  return customFetch<EventStudyResult>(getGetNewsEventStudyUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNewsEventStudyQueryKey = (params?: GetNewsEventStudyParams,) => {
+    return [
+    `/api/news/events`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetNewsEventStudyQueryOptions = <TData = Awaited<ReturnType<typeof getNewsEventStudy>>, TError = ErrorType<unknown>>(params: GetNewsEventStudyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNewsEventStudy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNewsEventStudyQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNewsEventStudy>>> = ({ signal }) => getNewsEventStudy(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNewsEventStudy>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNewsEventStudyQueryResult = NonNullable<Awaited<ReturnType<typeof getNewsEventStudy>>>
+export type GetNewsEventStudyQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Event study over archived headlines for a ticker
+ */
+
+export function useGetNewsEventStudy<TData = Awaited<ReturnType<typeof getNewsEventStudy>>, TError = ErrorType<unknown>>(
+ params: GetNewsEventStudyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNewsEventStudy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNewsEventStudyQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBacktestPlanUrl = () => {
+
+
+
+
+  return `/api/plan/backtest`
+}
+
+/**
+ * @summary Historical backtest of a planner allocation vs SPY
+ */
+export const backtestPlan = async (backtestPlanBody: BacktestPlanBody, options?: RequestInit): Promise<BacktestResult> => {
+
+  return customFetch<BacktestResult>(getBacktestPlanUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(backtestPlanBody)
+  }
+);}
+
+
+
+
+
+export const getBacktestPlanMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof backtestPlan>>, TError,{data: BodyType<BacktestPlanBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof backtestPlan>>, TError,{data: BodyType<BacktestPlanBody>}, TContext> => {
+
+const mutationKey = ['backtestPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof backtestPlan>>, {data: BodyType<BacktestPlanBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  backtestPlan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BacktestPlanMutationResult = NonNullable<Awaited<ReturnType<typeof backtestPlan>>>
+    export type BacktestPlanMutationBody = BodyType<BacktestPlanBody>
+    export type BacktestPlanMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Historical backtest of a planner allocation vs SPY
+ */
+export const useBacktestPlan = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof backtestPlan>>, TError,{data: BodyType<BacktestPlanBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof backtestPlan>>,
+        TError,
+        {data: BodyType<BacktestPlanBody>},
+        TContext
+      > => {
+      return useMutation(getBacktestPlanMutationOptions(options));
+    }
 
 export const getGetMarketPulseUrl = () => {
 

@@ -62,6 +62,8 @@ export interface TVStockInfo extends TVFundamentals {
   /** Return on equity, percent */
   roe: number | null;
   currentRatio: number | null;
+  /** Consensus EPS estimate for the next fiscal quarter */
+  epsForecast: number | null;
 }
 
 const EXTENDED_COLUMNS = [
@@ -71,6 +73,7 @@ const EXTENDED_COLUMNS = [
   "enterprise_value_fq",
   "return_on_equity_fq",
   "current_ratio_fq",
+  "earnings_per_share_forecast_next_fq",
 ];
 
 const extCache = new Map<string, { t: number; v: TVStockInfo | null }>();
@@ -120,6 +123,7 @@ export async function getTVStockInfo(symbolRaw: string): Promise<TVStockInfo | n
       enterpriseValue: num(d[9]),
       roe: num(d[10]),
       currentRatio: num(d[11]),
+      epsForecast: num(d[12]),
     };
     extCache.set(symbol, { t: Date.now(), v: value });
     return value;

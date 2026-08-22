@@ -1036,6 +1036,219 @@ export interface HistoryData {
   instrumentType?: string | null;
 }
 
+export type InsiderTradeAction = typeof InsiderTradeAction[keyof typeof InsiderTradeAction];
+
+
+export const InsiderTradeAction = {
+  buy: 'buy',
+  sell: 'sell',
+  option: 'option',
+  gift: 'gift',
+  award: 'award',
+  other: 'other',
+} as const;
+
+export interface InsiderTrade {
+  /**
+     * Transaction date from the Form 4 XML
+     * @nullable
+     */
+  date?: string | null;
+  filedAt: string;
+  insider: string;
+  /** @nullable */
+  role?: string | null;
+  action: InsiderTradeAction;
+  code: string;
+  /** @nullable */
+  shares?: number | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  valueUsd?: number | null;
+  /** @nullable */
+  afterOwnship?: number | null;
+}
+
+export interface InsidersData {
+  symbol: string;
+  /** @nullable */
+  issuer?: string | null;
+  trades: InsiderTrade[];
+  /** @nullable */
+  netBuyValueUsd?: number | null;
+  updatedAt: string;
+}
+
+export interface ChokepointRow {
+  id: string;
+  name: string;
+  date: string;
+  /** @nullable */
+  cargo?: number | null;
+  /** @nullable */
+  container?: number | null;
+  /** @nullable */
+  dryBulk?: number | null;
+  /** @nullable */
+  generalCargo?: number | null;
+  /** @nullable */
+  roro?: number | null;
+  /** @nullable */
+  tanker?: number | null;
+  /** @nullable */
+  totalTransits?: number | null;
+}
+
+export interface ChokepointsData {
+  chokepoints: ChokepointRow[];
+  /** @nullable */
+  date?: string | null;
+  updatedAt: string;
+}
+
+export interface StockSeries {
+  label: string;
+  /** @nullable */
+  latest?: number | null;
+  /** @nullable */
+  prevWeek?: number | null;
+  /** @nullable */
+  yearAgo?: number | null;
+  /** @nullable */
+  changeWow?: number | null;
+  /** @nullable */
+  changeYoy?: number | null;
+}
+
+export interface PetroleumData {
+  available: boolean;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  weekEnding?: string | null;
+  /** @nullable */
+  prevWeekEnding?: string | null;
+  stocks?: StockSeries[];
+  /** @nullable */
+  domesticProductionKbd?: number | null;
+  updatedAt: string;
+}
+
+export interface StrikeRow {
+  strike?: number;
+  /** @nullable */
+  callOi?: number | null;
+  /** @nullable */
+  putOi?: number | null;
+  /** @nullable */
+  callMark?: number | null;
+  /** @nullable */
+  putMark?: number | null;
+}
+
+export interface ExpiryChain {
+  date: string;
+  daysToExpiry: number;
+  strikes: StrikeRow[];
+  totalCallOi?: number;
+  totalPutOi?: number;
+  /** @nullable */
+  putCallRatio?: number | null;
+  /** @nullable */
+  maxPain?: number | null;
+}
+
+export interface FuturesRow {
+  instrument: string;
+  /** @nullable */
+  maturityDate?: string | null;
+  /** @nullable */
+  markPrice?: number | null;
+  /** @nullable */
+  lastPrice?: number | null;
+  /** @nullable */
+  openInterest?: number | null;
+  /** @nullable */
+  annualizedPct?: number | null;
+}
+
+export interface CryptoOptionsData {
+  currency: string;
+  /** @nullable */
+  spot?: number | null;
+  expiries: ExpiryChain[];
+  futures: FuturesRow[];
+  updatedAt: string;
+}
+
+export interface ArchivedArticle {
+  ticker?: string;
+  title?: string;
+  /** @nullable */
+  url?: string | null;
+  source?: string;
+  /** @nullable */
+  publishedAt?: string | null;
+  sentiment?: string;
+}
+
+export interface NewsArchiveResult {
+  articles: ArchivedArticle[];
+  total: number;
+  updatedAt: string;
+}
+
+export interface EventStudyEvent {
+  date: string;
+  headlines: number;
+  /** @nullable */
+  retPct?: number | null;
+  /** @nullable */
+  spyRetPct?: number | null;
+  /** @nullable */
+  excessPct?: number | null;
+}
+
+export interface EventStudyResult {
+  ticker: string;
+  windowDays: number;
+  events: EventStudyEvent[];
+  /** @nullable */
+  avgExcessPct?: number | null;
+  positiveEvents: number;
+  negativeEvents: number;
+}
+
+export interface BacktestPoint {
+  date: string;
+  portfolio: number;
+  /** @nullable */
+  spy?: number | null;
+}
+
+export type BacktestResultEtfsItem = {
+  ticker?: string;
+  percentOfPortfolio?: number;
+};
+
+export interface BacktestResult {
+  etfs: BacktestResultEtfsItem[];
+  months: number;
+  points: BacktestPoint[];
+  /** @nullable */
+  cagrPct?: number | null;
+  /** @nullable */
+  spyCagrPct?: number | null;
+  /** @nullable */
+  volPct?: number | null;
+  /** @nullable */
+  maxDrawdownPct?: number | null;
+  /** @nullable */
+  growthOf10kUsd?: number | null;
+  disclaimer: string;
+}
+
 export type GetSymbolSearchParams = {
 /**
  * Search text (ticker or company name fragment)
@@ -1079,4 +1292,56 @@ export const GetStockHistoryInterval = {
   '1mo': '1mo',
   '3mo': '3mo',
 } as const;
+
+export type GetCryptoOptionsParams = {
+currency?: GetCryptoOptionsCurrency;
+};
+
+export type GetCryptoOptionsCurrency = typeof GetCryptoOptionsCurrency[keyof typeof GetCryptoOptionsCurrency];
+
+
+export const GetCryptoOptionsCurrency = {
+  BTC: 'BTC',
+  ETH: 'ETH',
+} as const;
+
+export type QueryNewsArchiveParams = {
+ticker?: string;
+from?: string;
+to?: string;
+limit?: number;
+};
+
+export type GetNewsEventStudyParams = {
+ticker: string;
+/**
+ * Trading sessions ahead used to measure the post-headline return.
+ * @minimum 1
+ * @maximum 10
+ */
+window?: number;
+};
+
+export type BacktestPlanBodyHorizon = typeof BacktestPlanBodyHorizon[keyof typeof BacktestPlanBodyHorizon];
+
+
+export const BacktestPlanBodyHorizon = {
+  short: 'short',
+  medium: 'medium',
+  long: 'long',
+} as const;
+
+export type BacktestPlanBodyRiskTolerance = typeof BacktestPlanBodyRiskTolerance[keyof typeof BacktestPlanBodyRiskTolerance];
+
+
+export const BacktestPlanBodyRiskTolerance = {
+  conservative: 'conservative',
+  balanced: 'balanced',
+  aggressive: 'aggressive',
+} as const;
+
+export type BacktestPlanBody = {
+  horizon?: BacktestPlanBodyHorizon;
+  riskTolerance?: BacktestPlanBodyRiskTolerance;
+};
 

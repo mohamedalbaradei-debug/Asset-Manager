@@ -14,6 +14,12 @@ import { fetchMacroData, type MacroEntry } from "../lib/fredMacro";
 import { getMarketInternals } from "../lib/marketInternals";
 import { getEtfTracker } from "../lib/etfTracker";
 import { getStockDetail, getStockHistory } from "../lib/stockDetail";
+import { getChokepoints } from "../lib/portwatch";
+import { getPetroleumStatus } from "../lib/petroleum";
+import { getCryptoOptions } from "../lib/deribit";
+import { getInsiders } from "../lib/insiders";
+import { collectNews, queryArchive, getEventStudy } from "../lib/newsArchive";
+import { getWatchlist } from "../lib/storage";
 
 const router: IRouter = Router();
 
@@ -91,8 +97,72 @@ router.get("/fed", (req, res) => serve(req, res, fedCache, getFedData));
 router.get("/fx", (req, res) => serve(req, res, fxCache, getFxData));
 router.get("/valuation", (req, res) => serve(req, res, valuationCache, getValuationData));
 router.get("/shipping", (req, res) => serve(req, res, shippingCache, getShippingData));
-router.get("/news", (req, res) => serve(req, res, newsCache, getLatestNews));
+router.get("/news", async (req, res): Promise<void> => {
+  const cached = newsCache.get();
+  if (cached) {
+    res.json(cached);
+    return;
+  }
+  try {
+    const data = await getLatestNews();
+    // Archive headlines for later event studies (fire-and-forget).
+    collectNews(data.items, await getWatchlist());
+    newsCache.set(data);
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err }, "News fetch failed");
+    res.status(500).json({ error: "Failed to fetch news" });
+  }
+});
+
+router.get("/news/archive", async (req, res): Promise<void> => {
+  try {
+    const data = await queryArchive({
+      ticker: typeof req.query.ticker === "string" ? req.query.ticker : null,
+      from: typeof req.query.from === "string" ? req.query.from : null,
+      to: typeof req.query.to === "string" ? req.query.to : null,
+      limit: typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : undefined,
+    });
+    res.json({ ...data, updatedAt: new Date().toISOString() });
+  } catch (err) {
+    req.log.error({ err }, "News archive query failed");
+    res.status(500).json({ error: "Failed to query news archive" });
+  }
+});
+
+router.get("/news/events", async (req, res): Promise<void> => {
+  try {
+    const ticker = typeof req.query.ticker === "string" ? req.query.ticker : "";
+    if (!ticker) {
+      res.status(400).json({ error: "ticker query param required" });
+      return;
+    }
+    const windowDays =
+      typeof req.query.window === "string" ? parseInt(req.query.window, 10) : undefined;
+    const data = await getEventStudy(ticker, windowDays);
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err }, "Event study failed");
+    res.status(500).json({ error: "Failed to run event study" });
+  }
+});
 router.get("/etfs", (req, res) => serve(req, res, etfCache, getEtfTracker));
+
+const chokepointsCache = makeCache<object>(12 * 60 * 60 * 1000);
+const petroleumCache = makeCache<object>(6 * 60 * 60 * 1000);
+const cryptoOptionsCache = makeCache<object>(10 * 60 * 1000);
+
+router.get("/shipping/chokepoints", (req, res) => serve(req, res, chokepointsCache, getChokepoints));
+router.get("/petroleum", (req, res) => serve(req, res, petroleumCache, getPetroleumStatus));
+router.get("/crypto/options", async (req, res): Promise<void> => {  try {
+    const currency = typeof req.query.currency === "string" ? req.query.currency : "BTC";
+    const data = await getCryptoOptions(currency); // lib-level per-currency cache
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err }, "Crypto options fetch failed");
+    res.status(500).json({ error: "Failed to fetch crypto options" });
+  }
+});
 
 router.get("/stocks/:symbol/detail", async (req, res) => {
   const key = String(req.params.symbol ?? "").toUpperCase().trim();
@@ -129,6 +199,25 @@ router.get("/stocks/:symbol/history", async (req, res) => {
     res.json(data); // cached inside stockDetail lib (per symbol+range, 60 s)
   } catch {
     res.status(500).json({ error: "Failed to load history" });
+  }
+});
+
+router.get("/stocks/:symbol/insiders", async (req, res): Promise<void> => {
+  const key = String(req.params.symbol ?? "").toUpperCase().trim();
+  if (!key) {
+    res.status(400).json({ error: "symbol is required" });
+    return;
+  }
+  try {
+    const data = await getInsiders(key); // cached inside insiders lib (6 h)
+    if (!data || data.trades.length === 0) {
+      res.json({ symbol: key, issuer: null, trades: [], netBuyValueUsd: null, updatedAt: new Date().toISOString() });
+      return;
+    }
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err }, "Insiders fetch failed");
+    res.status(500).json({ error: "Failed to load insider activity" });
   }
 });
 

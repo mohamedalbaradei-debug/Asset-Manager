@@ -16,6 +16,7 @@ import {
   Calculator,
   ChartCandlestick,
   Search,
+  Bitcoin,
   type LucideIcon,
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
@@ -54,6 +55,7 @@ const navGroups: NavGroup[] = [
       { href: "/sectors", label: "Sector Rotation", icon: Layers },
       { href: "/spyqqq", label: "SPY vs QQQ", icon: GitCompareArrows },
       { href: "/gex", label: "GEX & Options Flow", icon: Sigma },
+      { href: "/crypto", label: "Crypto Options", icon: Bitcoin },
     ],
   },
   {

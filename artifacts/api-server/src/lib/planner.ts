@@ -153,6 +153,13 @@ async function fetchFxRate(currency: string): Promise<number | null> {
   }
 }
 
+/** Concrete ETF allocation for a horizon × risk profile (for backtesting). */
+export function etfAllocationFor(horizon: string, risk: string): PlanEtfPick[] {
+  const h = (["short", "medium", "long"].includes(horizon) ? horizon : "medium") as HorizonKey;
+  const r = (["conservative", "balanced", "aggressive"].includes(risk) ? risk : "balanced") as RiskKey;
+  return buildEtfs(ALLOCATION_MATRIX[h][r]);
+}
+
 export async function createPlan(input: PlanRequest): Promise<PlanResponse> {
   const horizon = input.horizon as HorizonKey;
   const risk = input.riskTolerance as RiskKey;

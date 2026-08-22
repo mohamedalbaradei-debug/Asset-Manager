@@ -344,6 +344,141 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /stocks/{symbol}/insiders:
+    get:
+      operationId: getStockInsiders
+      tags: [panels]
+      summary: Recent SEC Form 4 insider transactions
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Latest insider trades parsed from EDGAR filings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InsidersData"
+
+  /shipping/chokepoints:
+    get:
+      operationId: getChokepoints
+      tags: [panels]
+      summary: IMF PortWatch daily chokepoint transits
+      responses:
+        "200":
+          description: Latest-day vessel transit counts per maritime chokepoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChokepointsData"
+
+  /petroleum:
+    get:
+      operationId: getPetroleumStatus
+      tags: [panels]
+      summary: EIA Weekly Petroleum Status Report stocks
+      responses:
+        "200":
+          description: Weekly US oil inventories with WoW/YoY deltas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PetroleumData"
+
+  /crypto/options:
+    get:
+      operationId: getCryptoOptions
+      tags: [panels]
+      summary: Deribit crypto options chains and futures term structure
+      parameters:
+        - name: currency
+          in: query
+          schema:
+            type: string
+            enum: [BTC, ETH]
+            default: BTC
+      responses:
+        "200":
+          description: Option expiries with OI/max-pain and futures curve
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CryptoOptionsData"
+
+  /news/archive:
+    get:
+      operationId: queryNewsArchive
+      tags: [panels]
+      summary: Searchable news archive collected from the live feed
+      parameters:
+        - name: ticker
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100 }
+      responses:
+        "200":
+          description: Archived articles matching the filters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsArchiveResult"
+
+  /news/events:
+    get:
+      operationId: getNewsEventStudy
+      tags: [panels]
+      summary: Event study over archived headlines for a ticker
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          schema: { type: string }
+        - name: window
+          in: query
+          schema: { type: integer, default: 2, minimum: 1, maximum: 10 }
+          description: Trading sessions ahead used to measure the post-headline return.
+      responses:
+        "200":
+          description: Per-event-day returns vs SPY with aggregate stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventStudyResult"
+
+  /plan/backtest:
+    post:
+      operationId: backtestPlan
+      tags: [plan]
+      summary: Historical backtest of a planner allocation vs SPY
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                horizon: { type: string, enum: [short, medium, long], default: medium }
+                riskTolerance: { type: string, enum: [conservative, balanced, aggressive], default: balanced }
+      responses:
+        "200":
+          description: Indexed equity curves and risk metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestResult"
+
   /marketpulse:
     get:
       operationId: getMarketPulse
@@ -2131,3 +2266,201 @@ components:
         exchange: { type: ["string", "null"] }
         instrumentType: { type: ["string", "null"] }
       required: [symbol, range, interval, bars]
+
+    InsiderTrade:
+      type: object
+      properties:
+        date: { type: ["string", "null"], format: date, description: Transaction date from the Form 4 XML }
+        filedAt: { type: string, format: date }
+        insider: { type: string }
+        role: { type: ["string", "null"] }
+        action: { type: string, enum: [buy, sell, option, gift, award, other] }
+        code: { type: string }
+        shares: { type: ["number", "null"] }
+        price: { type: ["number", "null"] }
+        valueUsd: { type: ["number", "null"] }
+        afterOwnship: { type: ["number", "null"] }
+      required: [filedAt, insider, action, code]
+
+    InsidersData:
+      type: object
+      properties:
+        symbol: { type: string }
+        issuer: { type: ["string", "null"] }
+        trades:
+          type: array
+          items: { $ref: "#/components/schemas/InsiderTrade" }
+        netBuyValueUsd: { type: ["number", "null"] }
+        updatedAt: { type: string }
+      required: [symbol, trades, updatedAt]
+
+    ChokepointRow:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        date: { type: string, format: date }
+        cargo: { type: ["number", "null"] }
+        container: { type: ["number", "null"] }
+        dryBulk: { type: ["number", "null"] }
+        generalCargo: { type: ["number", "null"] }
+        roro: { type: ["number", "null"] }
+        tanker: { type: ["number", "null"] }
+        totalTransits: { type: ["number", "null"] }
+      required: [id, name, date]
+
+    ChokepointsData:
+      type: object
+      properties:
+        chokepoints:
+          type: array
+          items: { $ref: "#/components/schemas/ChokepointRow" }
+        date: { type: ["string", "null"], format: date }
+        updatedAt: { type: string }
+      required: [chokepoints, updatedAt]
+
+    StockSeries:
+      type: object
+      properties:
+        label: { type: string }
+        latest: { type: ["number", "null"] }
+        prevWeek: { type: ["number", "null"] }
+        yearAgo: { type: ["number", "null"] }
+        changeWow: { type: ["number", "null"] }
+        changeYoy: { type: ["number", "null"] }
+      required: [label]
+
+    PetroleumData:
+      type: object
+      properties:
+        available: { type: boolean }
+        note: { type: ["string", "null"] }
+        weekEnding: { type: ["string", "null"], format: date }
+        prevWeekEnding: { type: ["string", "null"], format: date }
+        stocks:
+          type: array
+          items: { $ref: "#/components/schemas/StockSeries" }
+        domesticProductionKbd: { type: ["number", "null"] }
+        updatedAt: { type: string }
+      required: [available, updatedAt]
+
+    StrikeRow:
+      type: object
+      properties:
+        strike: { type: number }
+        callOi: { type: ["number", "null"] }
+        putOi: { type: ["number", "null"] }
+        callMark: { type: ["number", "null"] }
+        putMark: { type: ["number", "null"] }
+
+    ExpiryChain:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        daysToExpiry: { type: number }
+        strikes:
+          type: array
+          items: { $ref: "#/components/schemas/StrikeRow" }
+        totalCallOi: { type: number }
+        totalPutOi: { type: number }
+        putCallRatio: { type: ["number", "null"] }
+        maxPain: { type: ["number", "null"] }
+      required: [date, daysToExpiry, strikes]
+
+    FuturesRow:
+      type: object
+      properties:
+        instrument: { type: string }
+        maturityDate: { type: ["string", "null"], format: date }
+        markPrice: { type: ["number", "null"] }
+        lastPrice: { type: ["number", "null"] }
+        openInterest: { type: ["number", "null"] }
+        annualizedPct: { type: ["number", "null"] }
+      required: [instrument]
+
+    CryptoOptionsData:
+      type: object
+      properties:
+        currency: { type: string }
+        spot: { type: ["number", "null"] }
+        expiries:
+          type: array
+          items: { $ref: "#/components/schemas/ExpiryChain" }
+        futures:
+          type: array
+          items: { $ref: "#/components/schemas/FuturesRow" }
+        updatedAt: { type: string }
+      required: [currency, expiries, futures, updatedAt]
+
+    ArchivedArticle:
+      type: object
+      properties:
+        ticker: { type: string }
+        title: { type: string }
+        url: { type: ["string", "null"] }
+        source: { type: string }
+        publishedAt: { type: ["string", "null"] }
+        sentiment: { type: string }
+
+    NewsArchiveResult:
+      type: object
+      properties:
+        articles:
+          type: array
+          items: { $ref: "#/components/schemas/ArchivedArticle" }
+        total: { type: number }
+        updatedAt: { type: string }
+      required: [articles, total, updatedAt]
+
+    EventStudyEvent:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        headlines: { type: number }
+        retPct: { type: ["number", "null"] }
+        spyRetPct: { type: ["number", "null"] }
+        excessPct: { type: ["number", "null"] }
+      required: [date, headlines]
+
+    EventStudyResult:
+      type: object
+      properties:
+        ticker: { type: string }
+        windowDays: { type: number }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/EventStudyEvent" }
+        avgExcessPct: { type: ["number", "null"] }
+        positiveEvents: { type: number }
+        negativeEvents: { type: number }
+      required: [ticker, windowDays, events, positiveEvents, negativeEvents]
+
+    BacktestPoint:
+      type: object
+      properties:
+        date: { type: string }
+        portfolio: { type: number }
+        spy: { type: ["number", "null"] }
+      required: [date, portfolio]
+
+    BacktestResult:
+      type: object
+      properties:
+        etfs:
+          type: array
+          items:
+            type: object
+            properties:
+              ticker: { type: string }
+              percentOfPortfolio: { type: number }
+        months: { type: number }
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/BacktestPoint" }
+        cagrPct: { type: ["number", "null"] }
+        spyCagrPct: { type: ["number", "null"] }
+        volPct: { type: ["number", "null"] }
+        maxDrawdownPct: { type: ["number", "null"] }
+        growthOf10kUsd: { type: ["number", "null"] }
+        disclaimer: { type: string }
+      required: [etfs, months, points, disclaimer]
