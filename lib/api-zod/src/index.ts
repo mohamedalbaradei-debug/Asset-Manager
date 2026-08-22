@@ -2,7 +2,7 @@
 // and a TS type with the same name for endpoints with QUERY parameters (e.g.
 // GetStockHistoryParams), and two star-exports of the same name collide.
 // Keep this list in sync with new parameterized operations.
-export type { GetStockHistoryParams, BacktestPlanBody } from "./generated/types";
+export type { GetStockHistoryParams, BacktestPlanBody, BindTelegramBody } from "./generated/types";
 
 export * from "./generated/api";
 export * from "./generated/types";

@@ -25,11 +25,18 @@ import type {
   AiStatus,
   AnalysisInput,
   AnalysisResult,
+  AuthCredentials,
+  AuthMeResponse,
+  AuthUserResponse,
   BacktestPlanBody,
   BacktestResult,
+  BindTelegram200,
+  BindTelegramBody,
   CalendarData,
+  CheckAlerts200,
   ChokepointsData,
   CryptoOptionsData,
+  DeletePriceAlert200,
   ErrorResponse,
   EtfTrackerData,
   EventStudyResult,
@@ -45,6 +52,7 @@ import type {
   HealthStatus,
   HistoryData,
   InsidersData,
+  LogoutAuth200,
   MacroMarketData,
   MarketPulse,
   MoversData,
@@ -54,6 +62,9 @@ import type {
   PetroleumData,
   PlanRequest,
   PlanResponse,
+  PriceAlert,
+  PriceAlertInput,
+  PriceAlertsResponse,
   QueryNewsArchiveParams,
   SectorRotationData,
   ShippingData,
@@ -2219,7 +2230,7 @@ export const getGetWatchlistUrl = () => {
 }
 
 /**
- * @summary List saved tickers
+ * @summary List saved tickers (per-user when signed in, global otherwise)
  */
 export const getWatchlist = async ( options?: RequestInit): Promise<WatchlistResponse> => {
 
@@ -2266,7 +2277,7 @@ export type GetWatchlistQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List saved tickers
+ * @summary List saved tickers (per-user when signed in, global otherwise)
  */
 
 export function useGetWatchlist<TData = Awaited<ReturnType<typeof getWatchlist>>, TError = ErrorType<unknown>>(
@@ -2582,6 +2593,657 @@ export function useGetCalendar<TData = Awaited<ReturnType<typeof getCalendar>>, 
 
 
 
+
+export const getRegisterAuthUrl = () => {
+
+
+
+
+  return `/api/auth/register`
+}
+
+/**
+ * @summary Create an account (email + password, min 8 chars)
+ */
+export const registerAuth = async (authCredentials: AuthCredentials, options?: RequestInit): Promise<AuthUserResponse> => {
+
+  return customFetch<AuthUserResponse>(getRegisterAuthUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(authCredentials)
+  }
+);}
+
+
+
+
+
+export const getRegisterAuthMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerAuth>>, TError,{data: BodyType<AuthCredentials>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerAuth>>, TError,{data: BodyType<AuthCredentials>}, TContext> => {
+
+const mutationKey = ['registerAuth'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerAuth>>, {data: BodyType<AuthCredentials>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerAuth(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterAuthMutationResult = NonNullable<Awaited<ReturnType<typeof registerAuth>>>
+    export type RegisterAuthMutationBody = BodyType<AuthCredentials>
+    export type RegisterAuthMutationError = ErrorType<void>
+
+    /**
+ * @summary Create an account (email + password, min 8 chars)
+ */
+export const useRegisterAuth = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerAuth>>, TError,{data: BodyType<AuthCredentials>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerAuth>>,
+        TError,
+        {data: BodyType<AuthCredentials>},
+        TContext
+      > => {
+      return useMutation(getRegisterAuthMutationOptions(options));
+    }
+
+export const getLoginAuthUrl = () => {
+
+
+
+
+  return `/api/auth/login`
+}
+
+/**
+ * @summary Sign in with email + password
+ */
+export const loginAuth = async (authCredentials: AuthCredentials, options?: RequestInit): Promise<AuthUserResponse> => {
+
+  return customFetch<AuthUserResponse>(getLoginAuthUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(authCredentials)
+  }
+);}
+
+
+
+
+
+export const getLoginAuthMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginAuth>>, TError,{data: BodyType<AuthCredentials>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof loginAuth>>, TError,{data: BodyType<AuthCredentials>}, TContext> => {
+
+const mutationKey = ['loginAuth'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginAuth>>, {data: BodyType<AuthCredentials>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  loginAuth(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginAuthMutationResult = NonNullable<Awaited<ReturnType<typeof loginAuth>>>
+    export type LoginAuthMutationBody = BodyType<AuthCredentials>
+    export type LoginAuthMutationError = ErrorType<void>
+
+    /**
+ * @summary Sign in with email + password
+ */
+export const useLoginAuth = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginAuth>>, TError,{data: BodyType<AuthCredentials>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof loginAuth>>,
+        TError,
+        {data: BodyType<AuthCredentials>},
+        TContext
+      > => {
+      return useMutation(getLoginAuthMutationOptions(options));
+    }
+
+export const getLogoutAuthUrl = () => {
+
+
+
+
+  return `/api/auth/logout`
+}
+
+/**
+ * @summary Destroy the current session
+ */
+export const logoutAuth = async ( options?: RequestInit): Promise<LogoutAuth200> => {
+
+  return customFetch<LogoutAuth200>(getLogoutAuthUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutAuthMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAuth>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logoutAuth>>, TError,void, TContext> => {
+
+const mutationKey = ['logoutAuth'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutAuth>>, void> = () => {
+
+
+          return  logoutAuth(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutAuthMutationResult = NonNullable<Awaited<ReturnType<typeof logoutAuth>>>
+
+    export type LogoutAuthMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Destroy the current session
+ */
+export const useLogoutAuth = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAuth>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logoutAuth>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutAuthMutationOptions(options));
+    }
+
+export const getGetAuthMeUrl = () => {
+
+
+
+
+  return `/api/auth/me`
+}
+
+/**
+ * @summary Current session user (null when signed out)
+ */
+export const getAuthMe = async ( options?: RequestInit): Promise<AuthMeResponse> => {
+
+  return customFetch<AuthMeResponse>(getGetAuthMeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuthMeQueryKey = () => {
+    return [
+    `/api/auth/me`
+    ] as const;
+    }
+
+
+export const getGetAuthMeQueryOptions = <TData = Awaited<ReturnType<typeof getAuthMe>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuthMeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthMe>>> = ({ signal }) => getAuthMe({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuthMeQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthMe>>>
+export type GetAuthMeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Current session user (null when signed out)
+ */
+
+export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuthMeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPriceAlertsUrl = () => {
+
+
+
+
+  return `/api/alerts/price`
+}
+
+/**
+ * @summary List the user's price alerts + telegram binding
+ */
+export const getPriceAlerts = async ( options?: RequestInit): Promise<PriceAlertsResponse> => {
+
+  return customFetch<PriceAlertsResponse>(getGetPriceAlertsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceAlertsQueryKey = () => {
+    return [
+    `/api/alerts/price`
+    ] as const;
+    }
+
+
+export const getGetPriceAlertsQueryOptions = <TData = Awaited<ReturnType<typeof getPriceAlerts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceAlertsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceAlerts>>> = ({ signal }) => getPriceAlerts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceAlerts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceAlertsQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceAlerts>>>
+export type GetPriceAlertsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the user's price alerts + telegram binding
+ */
+
+export function useGetPriceAlerts<TData = Awaited<ReturnType<typeof getPriceAlerts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceAlertsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePriceAlertUrl = () => {
+
+
+
+
+  return `/api/alerts/price`
+}
+
+/**
+ * @summary Create a price alert (fires via Telegram)
+ */
+export const createPriceAlert = async (priceAlertInput: PriceAlertInput, options?: RequestInit): Promise<PriceAlert> => {
+
+  return customFetch<PriceAlert>(getCreatePriceAlertUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(priceAlertInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePriceAlertMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPriceAlert>>, TError,{data: BodyType<PriceAlertInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPriceAlert>>, TError,{data: BodyType<PriceAlertInput>}, TContext> => {
+
+const mutationKey = ['createPriceAlert'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPriceAlert>>, {data: BodyType<PriceAlertInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPriceAlert(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePriceAlertMutationResult = NonNullable<Awaited<ReturnType<typeof createPriceAlert>>>
+    export type CreatePriceAlertMutationBody = BodyType<PriceAlertInput>
+    export type CreatePriceAlertMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a price alert (fires via Telegram)
+ */
+export const useCreatePriceAlert = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPriceAlert>>, TError,{data: BodyType<PriceAlertInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPriceAlert>>,
+        TError,
+        {data: BodyType<PriceAlertInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePriceAlertMutationOptions(options));
+    }
+
+export const getDeletePriceAlertUrl = (id: string,) => {
+
+
+
+
+  return `/api/alerts/price/${id}`
+}
+
+/**
+ * @summary Delete a price alert
+ */
+export const deletePriceAlert = async (id: string, options?: RequestInit): Promise<DeletePriceAlert200> => {
+
+  return customFetch<DeletePriceAlert200>(getDeletePriceAlertUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeletePriceAlertMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePriceAlert>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePriceAlert>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deletePriceAlert'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePriceAlert>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deletePriceAlert(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePriceAlertMutationResult = NonNullable<Awaited<ReturnType<typeof deletePriceAlert>>>
+
+    export type DeletePriceAlertMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a price alert
+ */
+export const useDeletePriceAlert = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePriceAlert>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePriceAlert>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeletePriceAlertMutationOptions(options));
+    }
+
+export const getBindTelegramUrl = () => {
+
+
+
+
+  return `/api/alerts/telegram`
+}
+
+/**
+ * @summary Bind + verify a Telegram chat id for alert delivery
+ */
+export const bindTelegram = async (bindTelegramBody: BindTelegramBody, options?: RequestInit): Promise<BindTelegram200> => {
+
+  return customFetch<BindTelegram200>(getBindTelegramUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(bindTelegramBody)
+  }
+);}
+
+
+
+
+
+export const getBindTelegramMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bindTelegram>>, TError,{data: BodyType<BindTelegramBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bindTelegram>>, TError,{data: BodyType<BindTelegramBody>}, TContext> => {
+
+const mutationKey = ['bindTelegram'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bindTelegram>>, {data: BodyType<BindTelegramBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bindTelegram(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BindTelegramMutationResult = NonNullable<Awaited<ReturnType<typeof bindTelegram>>>
+    export type BindTelegramMutationBody = BodyType<BindTelegramBody>
+    export type BindTelegramMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Bind + verify a Telegram chat id for alert delivery
+ */
+export const useBindTelegram = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bindTelegram>>, TError,{data: BodyType<BindTelegramBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bindTelegram>>,
+        TError,
+        {data: BodyType<BindTelegramBody>},
+        TContext
+      > => {
+      return useMutation(getBindTelegramMutationOptions(options));
+    }
+
+export const getCheckAlertsUrl = () => {
+
+
+
+
+  return `/api/alerts/check`
+}
+
+/**
+ * @summary Run the price-alert checker immediately
+ */
+export const checkAlerts = async ( options?: RequestInit): Promise<CheckAlerts200> => {
+
+  return customFetch<CheckAlerts200>(getCheckAlertsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckAlertsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkAlerts>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkAlerts>>, TError,void, TContext> => {
+
+const mutationKey = ['checkAlerts'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkAlerts>>, void> = () => {
+
+
+          return  checkAlerts(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckAlertsMutationResult = NonNullable<Awaited<ReturnType<typeof checkAlerts>>>
+
+    export type CheckAlertsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Run the price-alert checker immediately
+ */
+export const useCheckAlerts = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkAlerts>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof checkAlerts>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCheckAlertsMutationOptions(options));
+    }
 
 export const getGetPerformanceUrl = () => {
 

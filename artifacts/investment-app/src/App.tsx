@@ -22,6 +22,7 @@ import PlannerPage from '@/pages/planner';
 import EtfTrackerPage from '@/pages/etf-tracker';
 import StockDetailPage from '@/pages/stock-detail';
 import { Layout } from '@/components/layout';
+import { AuthProvider } from '@/lib/auth-context';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,29 +35,31 @@ const queryClient = new QueryClient({
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={HubPage} />
-        <Route path="/market" component={MarketPage} />
-        <Route path="/movers" component={MoversPage} />
-        <Route path="/sectors" component={SectorRotationPage} />
-        <Route path="/spyqqq" component={SpyQqqPage} />
-        <Route path="/gex" component={GexPage} />
-        <Route path="/crypto" component={CryptoOptionsPage} />
-        <Route path="/macro" component={MacroFullPage} />
-        <Route path="/global" component={GlobalMacroPage} />
-        <Route path="/fed" component={FedPage} />
-        <Route path="/fx" component={FxPage} />
-        <Route path="/valuation" component={ValuationPage} />
-        <Route path="/shipping" component={ShippingPage} />
-        <Route path="/news" component={NewsPage} />
-        <Route path="/watchlist" component={WatchlistPage} />
-        <Route path="/planner" component={PlannerPage} />
-        <Route path="/etfs" component={EtfTrackerPage} />
-        <Route path="/stocks/:symbol" component={StockDetailPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <AuthProvider>
+      <Layout>
+        <Switch>
+          <Route path="/" component={HubPage} />
+          <Route path="/market" component={MarketPage} />
+          <Route path="/movers" component={MoversPage} />
+          <Route path="/sectors" component={SectorRotationPage} />
+          <Route path="/spyqqq" component={SpyQqqPage} />
+          <Route path="/gex" component={GexPage} />
+          <Route path="/crypto" component={CryptoOptionsPage} />
+          <Route path="/macro" component={MacroFullPage} />
+          <Route path="/global" component={GlobalMacroPage} />
+          <Route path="/fed" component={FedPage} />
+          <Route path="/fx" component={FxPage} />
+          <Route path="/valuation" component={ValuationPage} />
+          <Route path="/shipping" component={ShippingPage} />
+          <Route path="/news" component={NewsPage} />
+          <Route path="/watchlist" component={WatchlistPage} />
+          <Route path="/planner" component={PlannerPage} />
+          <Route path="/etfs" component={EtfTrackerPage} />
+          <Route path="/stocks/:symbol" component={StockDetailPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+    </AuthProvider>
   );
 }
 

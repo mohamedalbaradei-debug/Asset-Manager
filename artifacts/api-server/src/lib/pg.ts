@@ -75,5 +75,37 @@ async function ensureSchema(pool: import("pg").Pool): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS news_archive_ticker_idx ON news_archive (ticker);
     CREATE INDEX IF NOT EXISTS news_archive_created_idx ON news_archive (created_at DESC);
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      pw_hash TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS user_watchlist (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ticker TEXT NOT NULL,
+      added_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, ticker)
+    );
+    CREATE TABLE IF NOT EXISTS price_alerts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ticker TEXT NOT NULL,
+      direction TEXT NOT NULL CHECK (direction IN ('above','below')),
+      price DOUBLE PRECISION NOT NULL,
+      last_triggered_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS price_alerts_user_idx ON price_alerts (user_id);
+    CREATE TABLE IF NOT EXISTS telegram_chats (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      chat_id TEXT NOT NULL
+    );
   `);
 }

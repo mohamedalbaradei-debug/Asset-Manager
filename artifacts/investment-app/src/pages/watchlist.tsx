@@ -6,14 +6,172 @@ import {
   useRemoveFromWatchlist,
   useGetCalendar,
   useGetPerformance,
+  useGetPriceAlerts,
+  useCreatePriceAlert,
+  useDeletePriceAlert,
+  useBindTelegram,
   getGetWatchlistSummaryQueryKey,
   getGetCalendarQueryKey,
   getGetPerformanceQueryKey,
+  getGetPriceAlertsQueryKey,
 } from "@workspace/api-client-react";
-import { Plus, X, Search, TrendingUp, CalendarDays, Target } from "lucide-react";
+import { Plus, X, Search, TrendingUp, CalendarDays, Target, BellRing, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, StatusBadge, fmtPct, pctColor, fmtNum, Card } from "@/components/panels";
+import { useAuth } from "@/lib/auth-context";
+
+/** Price alerts + Telegram delivery — requires sign-in. */
+function AlertsPanel() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [ticker, setTicker] = React.useState("");
+  const [direction, setDirection] = React.useState<"above" | "below">("above");
+  const [price, setPrice] = React.useState("");
+  const [chatId, setChatId] = React.useState("");
+  const [tgMsg, setTgMsg] = React.useState<string | null>(null);
+
+  const enabled = Boolean(user);
+  const { data } = useGetPriceAlerts({
+    query: { queryKey: getGetPriceAlertsQueryKey(), enabled, retry: false },
+  });
+  const createMutation = useCreatePriceAlert();
+  const deleteMutation = useDeletePriceAlert();
+  const bindMutation = useBindTelegram();
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getGetPriceAlertsQueryKey() });
+
+  if (!user) {
+    return (
+      <Card title="PRICE ALERTS (TELEGRAM)">
+        <p className="text-xs font-mono text-muted-foreground">
+          Sign in to create price alerts delivered to Telegram.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="PRICE ALERTS (TELEGRAM)">
+      <div className="space-y-4">
+        {data && data.alerts.length > 0 && (
+          <ul className="space-y-1.5">
+            {data.alerts.map((a) => (
+              <li key={a.id} className="flex items-center justify-between bg-secondary/60 rounded-md px-3 py-2 font-mono text-sm">
+                <span>
+                  <b className="text-primary">{a.ticker}</b>{" "}
+                  {a.direction === "above" ? "≥" : "≤"} ${fmtNum(a.price)}
+                </span>
+                <button
+                  onClick={() => deleteMutation.mutate({ id: a.id }, { onSuccess: invalidate })}
+                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                  aria-label="Delete alert"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const p = Number(price);
+            if (!ticker.trim() || !isFinite(p) || p <= 0) return;
+            createMutation.mutate(
+              {
+                data: { ticker: ticker.trim().toUpperCase(), direction, price: p },
+              },
+              {
+                onSuccess: () => {
+                  setTicker("");
+                  setPrice("");
+                  invalidate();
+                },
+              },
+            );
+          }}
+          className="flex flex-wrap items-center gap-2"
+        >
+          <input
+            placeholder="TICKER"
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value)}
+            className="w-24 bg-secondary border border-border rounded-md px-2.5 py-2 text-sm font-mono uppercase focus:outline-none focus:border-primary"
+          />
+          <select
+            value={direction}
+            onChange={(e) => setDirection(e.target.value as "above" | "below")}
+            className="bg-secondary border border-border rounded-md px-2 py-2 text-xs font-mono focus:outline-none"
+          >
+            <option value="above">ABOVE</option>
+            <option value="below">BELOW</option>
+          </select>
+          <input
+            placeholder="$ PRICE"
+            inputMode="decimal"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="w-28 bg-secondary border border-border rounded-md px-2.5 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+          />
+          <button
+            disabled={createMutation.isPending}
+            className="flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-md px-3 py-2 font-mono text-xs font-bold hover:bg-primary/20 transition-colors disabled:opacity-50"
+          >
+            <BellRing className="w-3.5 h-3.5" /> ALERT
+          </button>
+        </form>
+
+        <div className="border-t border-border pt-3 space-y-2">
+          {data?.telegramConfigured ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  placeholder="TELEGRAM CHAT ID"
+                  value={chatId}
+                  onChange={(e) => setChatId(e.target.value)}
+                  className="w-44 bg-secondary border border-border rounded-md px-2.5 py-2 text-xs font-mono focus:outline-none focus:border-primary"
+                />
+                <button
+                  onClick={() =>
+                    bindMutation.mutate(
+                      { data: { chatId } },
+                      {
+                        onSuccess: () => {
+                          setTgMsg("✓ connected — check Telegram");
+                          invalidate();
+                        },
+                        onError: () => setTgMsg("✗ send failed — press Start on the bot first"),
+                      },
+                    )
+                  }
+                  disabled={bindMutation.isPending || !chatId.trim()}
+                  className="font-mono text-xs text-primary hover:underline disabled:opacity-50"
+                >
+                  CONNECT & TEST
+                </button>
+                {tgMsg && <span className="font-mono text-[11px] text-muted-foreground">{tgMsg}</span>}
+              </div>
+              {data.chatId && (
+                <div className="text-[10px] font-mono text-muted-foreground">
+                  Bound chat: {data.chatId}
+                </div>
+              )}
+              <div className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
+                Message @userinfobot on Telegram for your numeric chat id. Alerts re-check every 15 min.
+              </div>
+            </>
+          ) : (
+            <div className="text-[10px] font-mono text-muted-foreground">
+              Alert delivery not configured on this server yet (TELEGRAM_BOT_TOKEN).
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function WatchlistPage() {
   const queryClient = useQueryClient();
@@ -147,8 +305,10 @@ export default function WatchlistPage() {
         </section>
       )}
 
-      {/* Calendar + performance */}
+      {/* Calendar + alerts + performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <AlertsPanel />
+
         <Card title="EARNINGS & DIVIDENDS CALENDAR">
           {isCalendarPending ? (
             <div className="flex justify-center py-10"><TrendingUp className="w-5 h-5 animate-pulse text-muted-foreground" /></div>

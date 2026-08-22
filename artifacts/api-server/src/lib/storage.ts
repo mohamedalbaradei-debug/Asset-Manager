@@ -95,6 +95,31 @@ export async function removeFromWatchlist(ticker: string): Promise<{ list: strin
   return { list: next, removed: true };
 }
 
+// ── Per-user watchlist (auth; Postgres only) ────────────────────────────────
+
+export async function getUserWatchlist(userId: string): Promise<string[]> {
+  const r = await pgQuery<{ ticker: string }>(
+    "SELECT ticker FROM user_watchlist WHERE user_id=$1 ORDER BY added_at ASC, ticker ASC",
+    [userId],
+  );
+  return r.rows.map((x) => x.ticker);
+}
+
+export async function addToUserWatchlist(userId: string, ticker: string): Promise<{ list: string[]; added: boolean }> {
+  const upper = ticker.toUpperCase().trim();
+  const ins = await pgQuery(
+    "INSERT INTO user_watchlist (user_id, ticker) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+    [userId, upper],
+  );
+  return { list: await getUserWatchlist(userId), added: (ins.rowCount ?? 0) > 0 };
+}
+
+export async function removeFromUserWatchlist(userId: string, ticker: string): Promise<{ list: string[]; removed: boolean }> {
+  const upper = ticker.toUpperCase().trim();
+  const del = await pgQuery("DELETE FROM user_watchlist WHERE user_id=$1 AND ticker=$2", [userId, upper]);
+  return { list: await getUserWatchlist(userId), removed: (del.rowCount ?? 0) > 0 };
+}
+
 // ── Performance log ──────────────────────────────────────────────────────────
 
 const perfFile = (): string => path.join(dataDir(), "performance.csv");

@@ -496,7 +496,7 @@ paths:
     get:
       operationId: getWatchlist
       tags: [watchlist]
-      summary: List saved tickers
+      summary: List saved tickers (per-user when signed in, global otherwise)
       responses:
         "200":
           description: Watchlist tickers
@@ -566,6 +566,176 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CalendarData"
+
+  /auth/register:
+    post:
+      operationId: registerAuth
+      tags: [watchlist]
+      summary: Create an account (email + password, min 8 chars)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "200":
+          description: Account created; session cookie set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserResponse"
+        "409":
+          description: Email already registered
+
+  /auth/login:
+    post:
+      operationId: loginAuth
+      tags: [watchlist]
+      summary: Sign in with email + password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "200":
+          description: Session cookie set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserResponse"
+        "401":
+          description: Bad credentials
+
+  /auth/logout:
+    post:
+      operationId: logoutAuth
+      tags: [watchlist]
+      summary: Destroy the current session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /auth/me:
+    get:
+      operationId: getAuthMe
+      tags: [watchlist]
+      summary: Current session user (null when signed out)
+      responses:
+        "200":
+          description: Session state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMeResponse"
+
+  /alerts/price:
+    get:
+      operationId: getPriceAlerts
+      tags: [watchlist]
+      summary: List the user's price alerts + telegram binding
+      responses:
+        "200":
+          description: Alerts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceAlertsResponse"
+    post:
+      operationId: createPriceAlert
+      tags: [watchlist]
+      summary: Create a price alert (fires via Telegram)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceAlertInput"
+      responses:
+        "200":
+          description: Created alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceAlert"
+
+  /alerts/price/{id}:
+    delete:
+      operationId: deletePriceAlert
+      tags: [watchlist]
+      summary: Delete a price alert
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /alerts/telegram:
+    post:
+      operationId: bindTelegram
+      tags: [watchlist]
+      summary: Bind + verify a Telegram chat id for alert delivery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                chatId:
+                  type: string
+              required:
+                - chatId
+      responses:
+        "200":
+          description: Bound (a verification message was sent)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /alerts/check:
+    post:
+      operationId: checkAlerts
+      tags: [watchlist]
+      summary: Run the price-alert checker immediately
+      responses:
+        "200":
+          description: Check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checked:
+                    type: integer
+                  sent:
+                    type: integer
+                  checkedAt:
+                    type: string
 
   /performance:
     get:
@@ -1758,6 +1928,107 @@ components:
       required:
         - list
         - added
+
+    AuthCredentials:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+      required:
+        - id
+        - email
+
+    AuthUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+
+    AuthMeResponse:
+      type: object
+      properties:
+        user:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/AuthUser"
+
+    PriceAlertInput:
+      type: object
+      properties:
+        ticker:
+          type: string
+        direction:
+          type: string
+          enum: [above, below]
+        price:
+          type: number
+      required:
+        - ticker
+        - direction
+        - price
+
+    PriceAlert:
+      type: object
+      properties:
+        id:
+          type: string
+        ticker:
+          type: string
+        direction:
+          type: string
+        price:
+          type: number
+      required:
+        - id
+        - ticker
+        - direction
+        - price
+
+    PriceAlertsResponse:
+      type: object
+      properties:
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              ticker:
+                type: string
+              direction:
+                type: string
+              price:
+                type: number
+              lastTriggeredAt:
+                type: string
+                nullable: true
+            required:
+              - id
+              - ticker
+              - direction
+              - price
+        telegramConfigured:
+          type: boolean
+        chatId:
+          type: string
+          nullable: true
+      required:
+        - alerts
+        - telegramConfigured
 
     WatchlistRemoveResponse:
       type: object

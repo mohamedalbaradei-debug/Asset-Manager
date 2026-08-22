@@ -619,6 +619,59 @@ export interface WatchlistAddResponse {
   added: boolean;
 }
 
+export interface AuthCredentials {
+  email: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
+
+export interface AuthUserResponse {
+  user?: AuthUser;
+}
+
+export interface AuthMeResponse {
+  user?: AuthUser | null;
+}
+
+export type PriceAlertInputDirection = typeof PriceAlertInputDirection[keyof typeof PriceAlertInputDirection];
+
+
+export const PriceAlertInputDirection = {
+  above: 'above',
+  below: 'below',
+} as const;
+
+export interface PriceAlertInput {
+  ticker: string;
+  direction: PriceAlertInputDirection;
+  price: number;
+}
+
+export interface PriceAlert {
+  id: string;
+  ticker: string;
+  direction: string;
+  price: number;
+}
+
+export type PriceAlertsResponseAlertsItem = {
+  id: string;
+  ticker: string;
+  direction: string;
+  price: number;
+  lastTriggeredAt?: string | null;
+};
+
+export interface PriceAlertsResponse {
+  alerts: PriceAlertsResponseAlertsItem[];
+  telegramConfigured: boolean;
+  chatId?: string | null;
+}
+
 export interface WatchlistRemoveResponse {
   list: string[];
   removed: boolean;
@@ -1343,5 +1396,27 @@ export const BacktestPlanBodyRiskTolerance = {
 export type BacktestPlanBody = {
   horizon?: BacktestPlanBodyHorizon;
   riskTolerance?: BacktestPlanBodyRiskTolerance;
+};
+
+export type LogoutAuth200 = {
+  ok?: boolean;
+};
+
+export type DeletePriceAlert200 = {
+  ok?: boolean;
+};
+
+export type BindTelegramBody = {
+  chatId: string;
+};
+
+export type BindTelegram200 = {
+  ok?: boolean;
+};
+
+export type CheckAlerts200 = {
+  checked?: number;
+  sent?: number;
+  checkedAt?: string;
 };
 

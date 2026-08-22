@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { SidebarAuthBlock } from "@/components/auth-dialog";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -123,6 +124,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="p-4 border-t border-border flex flex-col gap-2">
+          <SidebarAuthBlock />
           <div className="text-xs font-mono text-muted-foreground flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             SYS_ONLINE

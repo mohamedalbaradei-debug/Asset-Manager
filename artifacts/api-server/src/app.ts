@@ -5,6 +5,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { attachUser } from "./lib/auth";
 
 const app: Express = express();
 
@@ -31,7 +32,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api", router);
+// Populate req.user from the session cookie before any route runs.
+app.use("/api", attachUser, router);
 
 // Serve the built frontend when present (single-service deployment, e.g. Render).
 const webDist = path.resolve(

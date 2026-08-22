@@ -933,7 +933,7 @@ export const GetMarketPulseResponse = zod.object({
 
 
 /**
- * @summary List saved tickers
+ * @summary List saved tickers (per-user when signed in, global otherwise)
  */
 export const GetWatchlistResponse = zod.object({
   "watchlist": zod.array(zod.string())
@@ -1008,6 +1008,124 @@ export const GetCalendarResponse = zod.object({
 })),
   "ipoNote": zod.string(),
   "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Create an account (email + password, min 8 chars)
+ */
+export const RegisterAuthBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const RegisterAuthResponse = zod.object({
+  "user": zod.object({
+  "id": zod.string(),
+  "email": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Sign in with email + password
+ */
+export const LoginAuthBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const LoginAuthResponse = zod.object({
+  "user": zod.object({
+  "id": zod.string(),
+  "email": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Destroy the current session
+ */
+export const LogoutAuthResponse = zod.object({
+  "ok": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Current session user (null when signed out)
+ */
+export const GetAuthMeResponse = zod.object({
+  "user": zod.object({
+  "id": zod.string(),
+  "email": zod.string()
+}).nullish()
+})
+
+
+/**
+ * @summary List the user's price alerts + telegram binding
+ */
+export const GetPriceAlertsResponse = zod.object({
+  "alerts": zod.array(zod.object({
+  "id": zod.string(),
+  "ticker": zod.string(),
+  "direction": zod.string(),
+  "price": zod.number(),
+  "lastTriggeredAt": zod.string().nullish()
+})),
+  "telegramConfigured": zod.boolean(),
+  "chatId": zod.string().nullish()
+})
+
+
+/**
+ * @summary Create a price alert (fires via Telegram)
+ */
+export const CreatePriceAlertBody = zod.object({
+  "ticker": zod.string(),
+  "direction": zod.enum(['above', 'below']),
+  "price": zod.number()
+})
+
+export const CreatePriceAlertResponse = zod.object({
+  "id": zod.string(),
+  "ticker": zod.string(),
+  "direction": zod.string(),
+  "price": zod.number()
+})
+
+
+/**
+ * @summary Delete a price alert
+ */
+export const DeletePriceAlertParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeletePriceAlertResponse = zod.object({
+  "ok": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Bind + verify a Telegram chat id for alert delivery
+ */
+export const BindTelegramBody = zod.object({
+  "chatId": zod.string()
+})
+
+export const BindTelegramResponse = zod.object({
+  "ok": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Run the price-alert checker immediately
+ */
+export const CheckAlertsResponse = zod.object({
+  "checked": zod.number().optional(),
+  "sent": zod.number().optional(),
+  "checkedAt": zod.string().optional()
 })
 
 

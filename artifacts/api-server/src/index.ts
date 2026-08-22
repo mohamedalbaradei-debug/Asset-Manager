@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { startAlertLoop } from "./lib/notify";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,13 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Keep Render free instances warm + drive the price-alert checker.
+  const selfUrl = process.env["SELF_URL"];
+  if (selfUrl) {
+    setInterval(() => {
+      fetch(`${selfUrl}/api/healthz`).catch(() => {});
+    }, 14 * 60_000).unref();
+  }
+  startAlertLoop();
 });
