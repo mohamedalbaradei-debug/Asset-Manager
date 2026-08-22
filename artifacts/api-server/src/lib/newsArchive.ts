@@ -14,6 +14,7 @@ import { logger } from "./logger";
 
 import type { NewsItem } from "./newsSentiment";
 import { yahooFinance } from "./yahoo";
+import { hasPg, pgQuery } from "./pg";
 
 function dataDir(): string {
   return process.env.DATA_DIR ?? path.resolve(process.cwd(), "data");
@@ -108,14 +109,19 @@ function extractTickers(text: string, watchlist: string[]): string[] {
 
 let collectorRunning = false;
 
+/** One row per article-ticker pair; unique key survives collector restarts. */
+function dedupeKeyFor(url: string | null, title: string, ticker: string): string {
+  return `${(url ?? title).toLowerCase()}|${ticker}`;
+}
+
 /** Fire-and-forget collector called after each successful /news refresh. */
 export function collectNews(items: NewsItem[], watchlist: string[]): void {
   if (collectorRunning || items.length === 0) return;
   collectorRunning = true;
   void (async () => {
     try {
-      await fs.mkdir(dataDir(), { recursive: true });
-      const lines: string[] = [];
+      const rows: ArchivedArticle[] = [];
+      const seen = new Set<string>();
       for (const item of items) {
         const key = (item.link ?? item.title).toLowerCase();
         if (seenKeys.has(key)) continue;
@@ -124,21 +130,59 @@ export function collectNews(items: NewsItem[], watchlist: string[]): void {
         const cleanSummary = item.summary ? decodeEntities(item.summary) : "";
         const tickers = extractTickers(`${cleanTitle} ${cleanSummary}`, watchlist);
         for (const ticker of tickers.length > 0 ? tickers : ["_MARKET"]) {
-          lines.push(
-            JSON.stringify({
-              ticker,
-              title: cleanTitle,
-              url: item.link,
-              source: item.source,
-              publishedAt: item.publishedAt,
-              sentiment: item.sentimentLabel,
-            }),
-          );
+          const row: ArchivedArticle = {
+            ticker,
+            title: cleanTitle,
+            url: item.link,
+            source: item.source,
+            publishedAt: item.publishedAt,
+            sentiment: item.sentimentLabel,
+          };
+          const pairKey = dedupeKeyFor(row.url, row.title, row.ticker);
+          if (!seen.has(pairKey)) {
+            seen.add(pairKey);
+            rows.push(row);
+          }
         }
       }
-      if (lines.length > 0) {
-        await fs.appendFile(archiveFile(), lines.join("\n") + "\n", "utf-8");
+      if (rows.length === 0) return;
+
+      if (hasPg()) {
+        try {
+          // Batched multi-row insert; UNIQUE(dedupe_key) drops repeats across restarts.
+          const CHUNK = 100;
+          for (let i = 0; i < rows.length; i += CHUNK) {
+            const chunk = rows.slice(i, i + CHUNK);
+            const values: unknown[] = [];
+            const placeholders = chunk.map((r, j) => {
+              const b = j * 7;
+              values.push(
+                r.ticker,
+                r.title,
+                r.url,
+                r.source,
+                r.publishedAt,
+                r.sentiment,
+                dedupeKeyFor(r.url, r.title, r.ticker),
+              );
+              return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7})`;
+            });
+            await pgQuery(
+              `INSERT INTO news_archive (ticker, title, url, source, published_at, sentiment, dedupe_key)
+               VALUES ${placeholders.join(",")}
+               ON CONFLICT (dedupe_key) DO NOTHING`,
+              values,
+            );
+          }
+          return;
+        } catch (err) {
+          logger.warn({ err }, "News archive pg insert failed — using files");
+        }
       }
+
+      await fs.mkdir(dataDir(), { recursive: true });
+      const lines = rows.map((r) => JSON.stringify(r));
+      await fs.appendFile(archiveFile(), lines.join("\n") + "\n", "utf-8");
     } catch (err) {
       logger.warn({ err }, "News archive append failed");
     } finally {
@@ -148,6 +192,33 @@ export function collectNews(items: NewsItem[], watchlist: string[]): void {
 }
 
 async function readArchive(): Promise<ArchivedArticle[]> {
+  if (hasPg()) {
+    try {
+      // Cap the scan; newest rows first. Filtering happens in JS below so the
+      // RFC-date strings and title matching behave exactly like the file mode.
+      const r = await pgQuery<{
+        ticker: string;
+        title: string;
+        url: string | null;
+        source: string;
+        published_at: string | null;
+        sentiment: string;
+      }>(
+        `SELECT ticker, title, url, source, published_at, sentiment
+         FROM news_archive ORDER BY created_at DESC LIMIT 10000`,
+      );
+      return r.rows.map((x) => ({
+        ticker: x.ticker,
+        title: x.title,
+        url: x.url,
+        source: x.source,
+        publishedAt: x.published_at,
+        sentiment: x.sentiment,
+      }));
+    } catch (err) {
+      logger.warn({ err }, "News archive pg read failed — using files");
+    }
+  }
   let raw: string;
   try {
     raw = await fs.readFile(archiveFile(), "utf-8");
@@ -161,8 +232,8 @@ async function readArchive(): Promise<ArchivedArticle[]> {
     try {
       const obj = JSON.parse(line) as ArchivedArticle;
       if (!obj || typeof obj.title !== "string" || typeof obj.ticker !== "string") continue;
-      // One copy per article across collector restarts.
-      const key = (obj.url ?? obj.title).toLowerCase();
+      // One copy per article-ticker pair across collector restarts.
+      const key = dedupeKeyFor(obj.url ?? null, obj.title, obj.ticker);
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(obj);
