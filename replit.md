@@ -52,3 +52,12 @@ _Populate as you build — explicit user instructions worth remembering across s
 - After any OpenAPI spec change, run codegen before touching routes or frontend code.
 - yahoo-finance2 analysis calls take 3-8 seconds — the frontend shows an animated loading state while waiting.
 - `pnpm run dev` at workspace root has no script by design — run artifacts individually or via workflows.
+
+## Deploy notes (Render)
+
+- **Env-var changes need a manual redeploy.** Updating env vars via the
+  Render API/dashboard does NOT restart the service on its own. Trigger:
+  `POST /v1/services/{serviceId}/deploys` or Dashboard → Manual Deploy.
+- Storage: when `DATABASE_URL` is set (Neon `asset_manager` DB), watchlist,
+  performance log and news archive persist in Postgres; otherwise they fall
+  back to ephemeral files under DATA_DIR and are wiped on every deploy.
