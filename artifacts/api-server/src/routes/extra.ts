@@ -55,7 +55,11 @@ router.get("/watchlist/summary", async (_req: Request, res: Response): Promise<v
 router.get("/calendar", async (_req: Request, res: Response): Promise<void> => {
   try {
     const watchlist = await getWatchlist();
-    const data = await getCalendar(watchlist);
+    // Ephemeral disks start with an empty watchlist; show mega-cap earnings
+    // rather than an empty panel until the user curates their own list.
+    const tickers =
+      watchlist.length > 0 ? watchlist : ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"];
+    const data = await getCalendar(tickers);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: "Failed to load calendar" });
