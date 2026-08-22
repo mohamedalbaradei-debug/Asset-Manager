@@ -31,10 +31,12 @@ import type {
   FedData,
   FullUsMacro,
   FxData,
+  GetStockHistoryParams,
   GetSymbolSearchParams,
   GexResponse,
   GlobalMacro,
   HealthStatus,
+  HistoryData,
   MacroMarketData,
   MarketPulse,
   MoversData,
@@ -45,6 +47,7 @@ import type {
   SectorRotationData,
   ShippingData,
   SpyQqqRotation,
+  StockDetail,
   SymbolSearchData,
   TrendingTicker,
   ValuationData,
@@ -1386,6 +1389,173 @@ export function useGetEtfTracker<TData = Awaited<ReturnType<typeof getEtfTracker
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetEtfTrackerQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetStockDetailUrl = (symbol: string,) => {
+
+
+
+
+  return `/api/stocks/${symbol}/detail`
+}
+
+/**
+ * Quote stats from Yahoo chart meta, fundamentals from the TradingView scanner, five fiscal years of financial statements from SEC EDGAR XBRL and a corporate profile parsed from Wikipedia.
+ * @summary OpenAlice-style stock detail bundle
+ */
+export const getStockDetail = async (symbol: string, options?: RequestInit): Promise<StockDetail> => {
+
+  return customFetch<StockDetail>(getGetStockDetailUrl(symbol),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStockDetailQueryKey = (symbol: string,) => {
+    return [
+    `/api/stocks/${symbol}/detail`
+    ] as const;
+    }
+
+
+export const getGetStockDetailQueryOptions = <TData = Awaited<ReturnType<typeof getStockDetail>>, TError = ErrorType<ErrorResponse>>(symbol: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStockDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStockDetailQueryKey(symbol);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStockDetail>>> = ({ signal }) => getStockDetail(symbol, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: symbol !== null && symbol !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStockDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStockDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getStockDetail>>>
+export type GetStockDetailQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary OpenAlice-style stock detail bundle
+ */
+
+export function useGetStockDetail<TData = Awaited<ReturnType<typeof getStockDetail>>, TError = ErrorType<ErrorResponse>>(
+ symbol: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStockDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStockDetailQueryOptions(symbol,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetStockHistoryUrl = (symbol: string,
+    params?: GetStockHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stocks/${symbol}/history?${stringifiedParams}` : `/api/stocks/${symbol}/history`
+}
+
+/**
+ * @summary Price history bars for the interactive chart
+ */
+export const getStockHistory = async (symbol: string,
+    params?: GetStockHistoryParams, options?: RequestInit): Promise<HistoryData> => {
+
+  return customFetch<HistoryData>(getGetStockHistoryUrl(symbol,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStockHistoryQueryKey = (symbol: string,
+    params?: GetStockHistoryParams,) => {
+    return [
+    `/api/stocks/${symbol}/history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStockHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getStockHistory>>, TError = ErrorType<ErrorResponse>>(symbol: string,
+    params?: GetStockHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStockHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStockHistoryQueryKey(symbol,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStockHistory>>> = ({ signal }) => getStockHistory(symbol,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: symbol !== null && symbol !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStockHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStockHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getStockHistory>>>
+export type GetStockHistoryQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Price history bars for the interactive chart
+ */
+
+export function useGetStockHistory<TData = Awaited<ReturnType<typeof getStockHistory>>, TError = ErrorType<ErrorResponse>>(
+ symbol: string,
+    params?: GetStockHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStockHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStockHistoryQueryOptions(symbol,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

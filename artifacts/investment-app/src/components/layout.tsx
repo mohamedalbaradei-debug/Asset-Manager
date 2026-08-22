@@ -15,6 +15,7 @@ import {
   Star,
   Calculator,
   ChartCandlestick,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
@@ -43,6 +44,7 @@ const navGroups: NavGroup[] = [
       { href: "/market", label: "Market Macro", icon: Activity },
       { href: "/planner", label: "Planner", icon: Calculator },
       { href: "/etfs", label: "ETF Tracker", icon: ChartCandlestick },
+      { href: "/stocks/AAPL", label: "Stock Detail", icon: Search },
     ],
   },
   {

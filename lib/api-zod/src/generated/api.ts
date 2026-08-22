@@ -571,6 +571,110 @@ export const GetEtfTrackerResponse = zod.object({
 
 
 /**
+ * Quote stats from Yahoo chart meta, fundamentals from the TradingView scanner, five fiscal years of financial statements from SEC EDGAR XBRL and a corporate profile parsed from Wikipedia.
+ * @summary OpenAlice-style stock detail bundle
+ */
+export const GetStockDetailParams = zod.object({
+  "symbol": zod.coerce.string()
+})
+
+export const GetStockDetailResponse = zod.object({
+  "symbol": zod.string(),
+  "name": zod.string().nullish(),
+  "exchange": zod.string().nullish(),
+  "currency": zod.string().nullish(),
+  "instrumentType": zod.string().nullish(),
+  "price": zod.number().nullish(),
+  "changeAbs": zod.number().nullish(),
+  "changePct": zod.number().nullish(),
+  "open": zod.number().nullish(),
+  "prevClose": zod.number().nullish(),
+  "dayHigh": zod.number().nullish(),
+  "dayLow": zod.number().nullish(),
+  "volume": zod.number().nullish(),
+  "marketCap": zod.number().nullish(),
+  "fiftyTwoWeekHigh": zod.number().nullish(),
+  "fiftyTwoWeekLow": zod.number().nullish(),
+  "ma50": zod.number().nullish(),
+  "ma200": zod.number().nullish(),
+  "profile": zod.object({
+  "sector": zod.string().nullish(),
+  "industry": zod.string().nullish(),
+  "ceo": zod.string().nullish(),
+  "employees": zod.number().nullish(),
+  "hq": zod.string().nullish(),
+  "website": zod.string().nullish(),
+  "description": zod.string().nullish().describe('Plain-text company summary from Wikipedia')
+}),
+  "metrics": zod.object({
+  "pe": zod.number().nullish(),
+  "peg": zod.number().nullish(),
+  "ps": zod.number().nullish(),
+  "pb": zod.number().nullish(),
+  "evEbitda": zod.number().nullish(),
+  "evSales": zod.number().nullish(),
+  "divYield": zod.number().nullish().describe('percent'),
+  "roe": zod.number().nullish().describe('percent'),
+  "roa": zod.number().nullish().describe('percent'),
+  "grossMargin": zod.number().nullish().describe('percent'),
+  "opMargin": zod.number().nullish().describe('percent'),
+  "netMargin": zod.number().nullish().describe('percent'),
+  "debtEquity": zod.number().nullish().describe('percent'),
+  "currentRatio": zod.number().nullish(),
+  "enterpriseValue": zod.number().nullish()
+}),
+  "statements": zod.object({
+  "years": zod.array(zod.string()),
+  "income": zod.array(zod.object({
+  "label": zod.string(),
+  "values": zod.array(zod.number().nullable()).describe('Aligned with FinancialStatements.years (newest first)')
+})),
+  "balance": zod.array(zod.object({
+  "label": zod.string(),
+  "values": zod.array(zod.number().nullable()).describe('Aligned with FinancialStatements.years (newest first)')
+})),
+  "cashflow": zod.array(zod.object({
+  "label": zod.string(),
+  "values": zod.array(zod.number().nullable()).describe('Aligned with FinancialStatements.years (newest first)')
+}))
+}),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Price history bars for the interactive chart
+ */
+export const GetStockHistoryParams = zod.object({
+  "symbol": zod.coerce.string()
+})
+
+export const getStockHistoryQueryRangeDefault = `1Y`;
+
+export const GetStockHistoryQueryParams = zod.object({
+  "range": zod.enum(['1D', '5D', '1M', '3M', '1Y', '5Y', 'ALL']).default(getStockHistoryQueryRangeDefault),
+  "interval": zod.enum(['1m', '2m', '5m', '15m', '30m', '1h', '1d', '1wk', '1mo', '3mo']).optional().describe('Must be valid for the chosen range; falls back to the range default otherwise.')
+})
+
+export const GetStockHistoryResponse = zod.object({
+  "symbol": zod.string(),
+  "range": zod.string(),
+  "interval": zod.string(),
+  "bars": zod.array(zod.object({
+  "t": zod.string().describe('ISO timestamp'),
+  "o": zod.number().nullish(),
+  "h": zod.number().nullish(),
+  "l": zod.number().nullish(),
+  "c": zod.number(),
+  "v": zod.number().nullish()
+})),
+  "currency": zod.string().nullish(),
+  "exchange": zod.string().nullish(),
+  "instrumentType": zod.string().nullish()
+})
+
+
+/**
  * @summary Combined market pulse board
  */
 export const GetMarketPulseResponse = zod.object({

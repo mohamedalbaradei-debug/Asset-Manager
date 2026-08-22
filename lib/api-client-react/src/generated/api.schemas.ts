@@ -880,10 +880,203 @@ export interface EtfTrackerData {
   updatedAt: string;
 }
 
+export interface StockProfile {
+  /** @nullable */
+  sector?: string | null;
+  /** @nullable */
+  industry?: string | null;
+  /** @nullable */
+  ceo?: string | null;
+  /** @nullable */
+  employees?: number | null;
+  /** @nullable */
+  hq?: string | null;
+  /** @nullable */
+  website?: string | null;
+  /**
+     * Plain-text company summary from Wikipedia
+     * @nullable
+     */
+  description?: string | null;
+}
+
+export interface StockMetrics {
+  /** @nullable */
+  pe?: number | null;
+  /** @nullable */
+  peg?: number | null;
+  /** @nullable */
+  ps?: number | null;
+  /** @nullable */
+  pb?: number | null;
+  /** @nullable */
+  evEbitda?: number | null;
+  /** @nullable */
+  evSales?: number | null;
+  /**
+     * percent
+     * @nullable
+     */
+  divYield?: number | null;
+  /**
+     * percent
+     * @nullable
+     */
+  roe?: number | null;
+  /**
+     * percent
+     * @nullable
+     */
+  roa?: number | null;
+  /**
+     * percent
+     * @nullable
+     */
+  grossMargin?: number | null;
+  /**
+     * percent
+     * @nullable
+     */
+  opMargin?: number | null;
+  /**
+     * percent
+     * @nullable
+     */
+  netMargin?: number | null;
+  /**
+     * percent
+     * @nullable
+     */
+  debtEquity?: number | null;
+  /** @nullable */
+  currentRatio?: number | null;
+  /** @nullable */
+  enterpriseValue?: number | null;
+}
+
+export interface FinStatementRow {
+  label: string;
+  /** Aligned with FinancialStatements.years (newest first) */
+  values: (number | null)[];
+}
+
+export interface FinancialStatements {
+  years: string[];
+  income: FinStatementRow[];
+  balance: FinStatementRow[];
+  cashflow: FinStatementRow[];
+}
+
+export interface StockDetail {
+  symbol: string;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  exchange?: string | null;
+  /** @nullable */
+  currency?: string | null;
+  /** @nullable */
+  instrumentType?: string | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  changeAbs?: number | null;
+  /** @nullable */
+  changePct?: number | null;
+  /** @nullable */
+  open?: number | null;
+  /** @nullable */
+  prevClose?: number | null;
+  /** @nullable */
+  dayHigh?: number | null;
+  /** @nullable */
+  dayLow?: number | null;
+  /** @nullable */
+  volume?: number | null;
+  /** @nullable */
+  marketCap?: number | null;
+  /** @nullable */
+  fiftyTwoWeekHigh?: number | null;
+  /** @nullable */
+  fiftyTwoWeekLow?: number | null;
+  /** @nullable */
+  ma50?: number | null;
+  /** @nullable */
+  ma200?: number | null;
+  profile: StockProfile;
+  metrics: StockMetrics;
+  statements: FinancialStatements;
+  updatedAt: string;
+}
+
+export interface HistoryBar {
+  /** ISO timestamp */
+  t: string;
+  /** @nullable */
+  o?: number | null;
+  /** @nullable */
+  h?: number | null;
+  /** @nullable */
+  l?: number | null;
+  c: number;
+  /** @nullable */
+  v?: number | null;
+}
+
+export interface HistoryData {
+  symbol: string;
+  range: string;
+  interval: string;
+  bars: HistoryBar[];
+  /** @nullable */
+  currency?: string | null;
+  /** @nullable */
+  exchange?: string | null;
+  /** @nullable */
+  instrumentType?: string | null;
+}
+
 export type GetSymbolSearchParams = {
 /**
  * Search text (ticker or company name fragment)
  */
 q: string;
 };
+
+export type GetStockHistoryParams = {
+range?: GetStockHistoryRange;
+/**
+ * Must be valid for the chosen range; falls back to the range default otherwise.
+ */
+interval?: GetStockHistoryInterval;
+};
+
+export type GetStockHistoryRange = typeof GetStockHistoryRange[keyof typeof GetStockHistoryRange];
+
+
+export const GetStockHistoryRange = {
+  '1D': '1D',
+  '5D': '5D',
+  '1M': '1M',
+  '3M': '3M',
+  '1Y': '1Y',
+  '5Y': '5Y',
+  ALL: 'ALL',
+} as const;
+
+export type GetStockHistoryInterval = typeof GetStockHistoryInterval[keyof typeof GetStockHistoryInterval];
+
+
+export const GetStockHistoryInterval = {
+  '1m': '1m',
+  '2m': '2m',
+  '5m': '5m',
+  '15m': '15m',
+  '30m': '30m',
+  '1h': '1h',
+  '1d': '1d',
+  '1wk': '1wk',
+  '1mo': '1mo',
+  '3mo': '3mo',
+} as const;
 

@@ -278,6 +278,72 @@ paths:
               schema:
                 $ref: "#/components/schemas/EtfTrackerData"
 
+  /stocks/{symbol}/detail:
+    get:
+      operationId: getStockDetail
+      tags: [panels]
+      summary: OpenAlice-style stock detail bundle
+      description: >
+        Quote stats from Yahoo chart meta, fundamentals from the TradingView
+        scanner, five fiscal years of financial statements from SEC EDGAR XBRL
+        and a corporate profile parsed from Wikipedia.
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stock detail bundle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockDetail"
+        "404":
+          description: Unknown ticker
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stocks/{symbol}/history:
+    get:
+      operationId: getStockHistory
+      tags: [panels]
+      summary: Price history bars for the interactive chart
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: ["1D", "5D", "1M", "3M", "1Y", "5Y", "ALL"]
+            default: "1Y"
+        - name: interval
+          in: query
+          schema:
+            type: string
+            enum: ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk", "1mo", "3mo"]
+          description: Must be valid for the chosen range; falls back to the range default otherwise.
+      responses:
+        "200":
+          description: OHLCV bars
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryData"
+        "404":
+          description: No history available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /marketpulse:
     get:
       operationId: getMarketPulse
@@ -1943,3 +2009,125 @@ components:
       required:
         - groups
         - updatedAt
+
+    StockProfile:
+      type: object
+      properties:
+        sector:
+          type: ["string", "null"]
+        industry:
+          type: ["string", "null"]
+        ceo:
+          type: ["string", "null"]
+        employees:
+          type: ["number", "null"]
+        hq:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+          description: Plain-text company summary from Wikipedia
+
+    StockMetrics:
+      type: object
+      properties:
+        pe: { type: ["number", "null"] }
+        peg: { type: ["number", "null"] }
+        ps: { type: ["number", "null"] }
+        pb: { type: ["number", "null"] }
+        evEbitda: { type: ["number", "null"] }
+        evSales: { type: ["number", "null"] }
+        divYield: { type: ["number", "null"], description: percent }
+        roe: { type: ["number", "null"], description: percent }
+        roa: { type: ["number", "null"], description: percent }
+        grossMargin: { type: ["number", "null"], description: percent }
+        opMargin: { type: ["number", "null"], description: percent }
+        netMargin: { type: ["number", "null"], description: percent }
+        debtEquity: { type: ["number", "null"], description: percent }
+        currentRatio: { type: ["number", "null"] }
+        enterpriseValue: { type: ["number", "null"] }
+
+    FinStatementRow:
+      type: object
+      properties:
+        label: { type: string }
+        values:
+          type: array
+          items: { type: ["number", "null"] }
+          description: Aligned with FinancialStatements.years (newest first)
+      required: [label, values]
+
+    FinancialStatements:
+      type: object
+      properties:
+        years:
+          type: array
+          items: { type: string }
+        income:
+          type: array
+          items: { $ref: "#/components/schemas/FinStatementRow" }
+        balance:
+          type: array
+          items: { $ref: "#/components/schemas/FinStatementRow" }
+        cashflow:
+          type: array
+          items: { $ref: "#/components/schemas/FinStatementRow" }
+      required: [years, income, balance, cashflow]
+
+    StockDetail:
+      type: object
+      properties:
+        symbol: { type: string }
+        name: { type: ["string", "null"] }
+        exchange: { type: ["string", "null"] }
+        currency: { type: ["string", "null"] }
+        instrumentType: { type: ["string", "null"] }
+        price: { type: ["number", "null"] }
+        changeAbs: { type: ["number", "null"] }
+        changePct: { type: ["number", "null"] }
+        open: { type: ["number", "null"] }
+        prevClose: { type: ["number", "null"] }
+        dayHigh: { type: ["number", "null"] }
+        dayLow: { type: ["number", "null"] }
+        volume: { type: ["number", "null"] }
+        marketCap: { type: ["number", "null"] }
+        fiftyTwoWeekHigh: { type: ["number", "null"] }
+        fiftyTwoWeekLow: { type: ["number", "null"] }
+        ma50: { type: ["number", "null"] }
+        ma200: { type: ["number", "null"] }
+        profile: { $ref: "#/components/schemas/StockProfile" }
+        metrics: { $ref: "#/components/schemas/StockMetrics" }
+        statements: { $ref: "#/components/schemas/FinancialStatements" }
+        updatedAt: { type: string }
+      required:
+        - symbol
+        - profile
+        - metrics
+        - statements
+        - updatedAt
+
+    HistoryBar:
+      type: object
+      properties:
+        t: { type: string, description: ISO timestamp }
+        o: { type: ["number", "null"] }
+        h: { type: ["number", "null"] }
+        l: { type: ["number", "null"] }
+        c: { type: number }
+        v: { type: ["number", "null"] }
+      required: [t, c]
+
+    HistoryData:
+      type: object
+      properties:
+        symbol: { type: string }
+        range: { type: string }
+        interval: { type: string }
+        bars:
+          type: array
+          items: { $ref: "#/components/schemas/HistoryBar" }
+        currency: { type: ["string", "null"] }
+        exchange: { type: ["string", "null"] }
+        instrumentType: { type: ["string", "null"] }
+      required: [symbol, range, interval, bars]

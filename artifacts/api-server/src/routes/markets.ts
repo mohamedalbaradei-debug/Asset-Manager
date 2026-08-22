@@ -13,6 +13,7 @@ import { getLatestNews } from "../lib/newsSentiment";
 import { fetchMacroData, type MacroEntry } from "../lib/fredMacro";
 import { getMarketInternals } from "../lib/marketInternals";
 import { getEtfTracker } from "../lib/etfTracker";
+import { getStockDetail, getStockHistory } from "../lib/stockDetail";
 
 const router: IRouter = Router();
 
@@ -92,6 +93,44 @@ router.get("/valuation", (req, res) => serve(req, res, valuationCache, getValuat
 router.get("/shipping", (req, res) => serve(req, res, shippingCache, getShippingData));
 router.get("/news", (req, res) => serve(req, res, newsCache, getLatestNews));
 router.get("/etfs", (req, res) => serve(req, res, etfCache, getEtfTracker));
+
+router.get("/stocks/:symbol/detail", async (req, res) => {
+  const key = String(req.params.symbol ?? "").toUpperCase().trim();
+  if (!key) {
+    res.status(400).json({ error: "symbol is required" });
+    return;
+  }
+  try {
+    const data = await getStockDetail(key);
+    if (!data) {
+      res.status(404).json({ error: `Unknown ticker ${key}` });
+      return;
+    }
+    res.json(data); // cached inside stockDetail lib (per symbol, 15 min)
+  } catch {
+    res.status(500).json({ error: "Failed to load stock detail" });
+  }
+});
+
+router.get("/stocks/:symbol/history", async (req, res) => {
+  const key = String(req.params.symbol ?? "").toUpperCase().trim();
+  if (!key) {
+    res.status(400).json({ error: "symbol is required" });
+    return;
+  }
+  const range = String(req.query.range ?? "1Y");
+  const interval = typeof req.query.interval === "string" ? req.query.interval : undefined;
+  try {
+    const data = await getStockHistory(key, range, interval);
+    if (!data) {
+      res.status(404).json({ error: `No history for ${key}` });
+      return;
+    }
+    res.json(data); // cached inside stockDetail lib (per symbol+range, 60 s)
+  } catch {
+    res.status(500).json({ error: "Failed to load history" });
+  }
+});
 
 router.get("/marketpulse", async (req, res): Promise<void> => {
   try {
