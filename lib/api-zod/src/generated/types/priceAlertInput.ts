@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { PriceAlertInputDirection } from './priceAlertInputDirection';
+import type { PriceAlertInputKind } from './priceAlertInputKind';
 
 export interface PriceAlertInput {
   ticker: string;
-  direction: PriceAlertInputDirection;
-  price: number;
+  direction?: PriceAlertInputDirection;
+  kind?: PriceAlertInputKind;
+  price?: number;
 }

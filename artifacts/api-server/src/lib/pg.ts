@@ -98,14 +98,31 @@ async function ensureSchema(pool: import("pg").Pool): Promise<void> {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       ticker TEXT NOT NULL,
       direction TEXT NOT NULL CHECK (direction IN ('above','below')),
+      kind TEXT NOT NULL DEFAULT 'price' CHECK (kind IN ('price','rsi_oversold','rsi_overbought')),
       price DOUBLE PRECISION NOT NULL,
       last_triggered_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS price_alerts_user_idx ON price_alerts (user_id);
+    CREATE TABLE IF NOT EXISTS user_holdings (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ticker TEXT NOT NULL,
+      qty DOUBLE PRECISION NOT NULL,
+      cost_usd DOUBLE PRECISION,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS user_holdings_user_idx ON user_holdings (user_id);
     CREATE TABLE IF NOT EXISTS telegram_chats (
       user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      chat_id TEXT NOT NULL
+      chat_id TEXT NOT NULL,
+      digest_enabled BOOLEAN NOT NULL DEFAULT true
     );
+  `);
+  // Migrations for tables created before these columns existed.
+  await pool.query(`
+    ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'price';
+    ALTER TABLE telegram_chats ADD COLUMN IF NOT EXISTS digest_enabled BOOLEAN NOT NULL DEFAULT true;
+    UPDATE price_alerts SET kind='price' WHERE kind IS NULL;
   `);
 }

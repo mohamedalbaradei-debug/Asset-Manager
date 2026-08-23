@@ -10,6 +10,7 @@ export type PriceAlertsResponseAlertsItem = {
   id: string;
   ticker: string;
   direction: string;
+  kind?: string;
   price: number;
   lastTriggeredAt?: string | null;
 };

@@ -17,6 +17,7 @@ import {
   ChartCandlestick,
   Search,
   Bitcoin,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
@@ -75,6 +76,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/news", label: "News & Pulse", icon: Newspaper },
       { href: "/watchlist", label: "Watchlist & Calendar", icon: Star },
+      { href: "/holdings", label: "My Holdings", icon: Wallet },
     ],
   },
 ];

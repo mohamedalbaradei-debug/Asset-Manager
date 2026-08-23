@@ -8,6 +8,7 @@ import aiRouter from "./ai";
 import planRouter from "./plan";
 import authRouter from "./auth";
 import alertsRouter from "./alerts";
+import holdingsRouter from "./holdings";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(extraRouter);
 router.use(aiRouter);
 router.use(planRouter);
 router.use(alertsRouter);
+router.use(holdingsRouter);
 
 export default router;

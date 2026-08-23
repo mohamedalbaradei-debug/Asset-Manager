@@ -18,6 +18,7 @@ import ValuationPage from '@/pages/valuation';
 import ShippingPage from '@/pages/shipping';
 import NewsPage from '@/pages/news';
 import WatchlistPage from '@/pages/watchlist';
+import HoldingsPage from '@/pages/holdings';
 import PlannerPage from '@/pages/planner';
 import EtfTrackerPage from '@/pages/etf-tracker';
 import StockDetailPage from '@/pages/stock-detail';
@@ -53,6 +54,7 @@ function Router() {
           <Route path="/shipping" component={ShippingPage} />
           <Route path="/news" component={NewsPage} />
           <Route path="/watchlist" component={WatchlistPage} />
+          <Route path="/holdings" component={HoldingsPage} />
           <Route path="/planner" component={PlannerPage} />
           <Route path="/etfs" component={EtfTrackerPage} />
           <Route path="/stocks/:symbol" component={StockDetailPage} />

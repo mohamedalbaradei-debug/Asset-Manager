@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AddHolding200,
   AiChatReply,
   AiChatRequest,
   AiStatus,
@@ -36,6 +37,7 @@ import type {
   CheckAlerts200,
   ChokepointsData,
   CryptoOptionsData,
+  DeleteHolding200,
   DeletePriceAlert200,
   ErrorResponse,
   EtfTrackerData,
@@ -44,6 +46,7 @@ import type {
   FullUsMacro,
   FxData,
   GetCryptoOptionsParams,
+  GetHoldingQuote200,
   GetNewsEventStudyParams,
   GetStockHistoryParams,
   GetSymbolSearchParams,
@@ -51,6 +54,9 @@ import type {
   GlobalMacro,
   HealthStatus,
   HistoryData,
+  HoldingInput,
+  HoldingPatchInput,
+  HoldingsResponse,
   InsidersData,
   LogoutAuth200,
   MacroMarketData,
@@ -66,12 +72,16 @@ import type {
   PriceAlertInput,
   PriceAlertsResponse,
   QueryNewsArchiveParams,
+  RunDigestNow200,
   SectorRotationData,
   ShippingData,
   SpyQqqRotation,
   StockDetail,
   SymbolSearchData,
+  ToggleDigest200,
+  ToggleDigestBody,
   TrendingTicker,
+  UpdateHolding200,
   ValuationData,
   WatchlistAddInput,
   WatchlistAddResponse,
@@ -3244,6 +3254,516 @@ export const useCheckAlerts = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCheckAlertsMutationOptions(options));
     }
+
+export const getToggleDigestUrl = () => {
+
+
+
+
+  return `/api/alerts/digest`
+}
+
+/**
+ * @summary Enable or disable the daily Telegram digest for this account
+ */
+export const toggleDigest = async (toggleDigestBody: ToggleDigestBody, options?: RequestInit): Promise<ToggleDigest200> => {
+
+  return customFetch<ToggleDigest200>(getToggleDigestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(toggleDigestBody)
+  }
+);}
+
+
+
+
+
+export const getToggleDigestMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleDigest>>, TError,{data: BodyType<ToggleDigestBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleDigest>>, TError,{data: BodyType<ToggleDigestBody>}, TContext> => {
+
+const mutationKey = ['toggleDigest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleDigest>>, {data: BodyType<ToggleDigestBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  toggleDigest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleDigestMutationResult = NonNullable<Awaited<ReturnType<typeof toggleDigest>>>
+    export type ToggleDigestMutationBody = BodyType<ToggleDigestBody>
+    export type ToggleDigestMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enable or disable the daily Telegram digest for this account
+ */
+export const useToggleDigest = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleDigest>>, TError,{data: BodyType<ToggleDigestBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleDigest>>,
+        TError,
+        {data: BodyType<ToggleDigestBody>},
+        TContext
+      > => {
+      return useMutation(getToggleDigestMutationOptions(options));
+    }
+
+export const getRunDigestNowUrl = () => {
+
+
+
+
+  return `/api/alerts/digest/run`
+}
+
+/**
+ * @summary Send the digest immediately (testing)
+ */
+export const runDigestNow = async ( options?: RequestInit): Promise<RunDigestNow200> => {
+
+  return customFetch<RunDigestNow200>(getRunDigestNowUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRunDigestNowMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runDigestNow>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runDigestNow>>, TError,void, TContext> => {
+
+const mutationKey = ['runDigestNow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runDigestNow>>, void> = () => {
+
+
+          return  runDigestNow(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunDigestNowMutationResult = NonNullable<Awaited<ReturnType<typeof runDigestNow>>>
+
+    export type RunDigestNowMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send the digest immediately (testing)
+ */
+export const useRunDigestNow = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runDigestNow>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runDigestNow>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRunDigestNowMutationOptions(options));
+    }
+
+export const getGetHoldingsUrl = () => {
+
+
+
+
+  return `/api/holdings`
+}
+
+/**
+ * @summary List the user's holdings valued live (USD)
+ */
+export const getHoldings = async ( options?: RequestInit): Promise<HoldingsResponse> => {
+
+  return customFetch<HoldingsResponse>(getGetHoldingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHoldingsQueryKey = () => {
+    return [
+    `/api/holdings`
+    ] as const;
+    }
+
+
+export const getGetHoldingsQueryOptions = <TData = Awaited<ReturnType<typeof getHoldings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHoldings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHoldingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHoldings>>> = ({ signal }) => getHoldings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHoldings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHoldingsQueryResult = NonNullable<Awaited<ReturnType<typeof getHoldings>>>
+export type GetHoldingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the user's holdings valued live (USD)
+ */
+
+export function useGetHoldings<TData = Awaited<ReturnType<typeof getHoldings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHoldings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHoldingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAddHoldingUrl = () => {
+
+
+
+
+  return `/api/holdings`
+}
+
+/**
+ * @summary Add a holding (ticker, qty, optional cost basis)
+ */
+export const addHolding = async (holdingInput: HoldingInput, options?: RequestInit): Promise<AddHolding200> => {
+
+  return customFetch<AddHolding200>(getAddHoldingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(holdingInput)
+  }
+);}
+
+
+
+
+
+export const getAddHoldingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addHolding>>, TError,{data: BodyType<HoldingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addHolding>>, TError,{data: BodyType<HoldingInput>}, TContext> => {
+
+const mutationKey = ['addHolding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addHolding>>, {data: BodyType<HoldingInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  addHolding(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddHoldingMutationResult = NonNullable<Awaited<ReturnType<typeof addHolding>>>
+    export type AddHoldingMutationBody = BodyType<HoldingInput>
+    export type AddHoldingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a holding (ticker, qty, optional cost basis)
+ */
+export const useAddHolding = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addHolding>>, TError,{data: BodyType<HoldingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addHolding>>,
+        TError,
+        {data: BodyType<HoldingInput>},
+        TContext
+      > => {
+      return useMutation(getAddHoldingMutationOptions(options));
+    }
+
+export const getUpdateHoldingUrl = (id: string,) => {
+
+
+
+
+  return `/api/holdings/${id}`
+}
+
+/**
+ * @summary Update quantity and/or cost basis
+ */
+export const updateHolding = async (id: string,
+    holdingPatchInput: HoldingPatchInput, options?: RequestInit): Promise<UpdateHolding200> => {
+
+  return customFetch<UpdateHolding200>(getUpdateHoldingUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(holdingPatchInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateHoldingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHolding>>, TError,{id: string;data: BodyType<HoldingPatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateHolding>>, TError,{id: string;data: BodyType<HoldingPatchInput>}, TContext> => {
+
+const mutationKey = ['updateHolding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateHolding>>, {id: string;data: BodyType<HoldingPatchInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateHolding(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateHoldingMutationResult = NonNullable<Awaited<ReturnType<typeof updateHolding>>>
+    export type UpdateHoldingMutationBody = BodyType<HoldingPatchInput>
+    export type UpdateHoldingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update quantity and/or cost basis
+ */
+export const useUpdateHolding = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHolding>>, TError,{id: string;data: BodyType<HoldingPatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateHolding>>,
+        TError,
+        {id: string;data: BodyType<HoldingPatchInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateHoldingMutationOptions(options));
+    }
+
+export const getDeleteHoldingUrl = (id: string,) => {
+
+
+
+
+  return `/api/holdings/${id}`
+}
+
+/**
+ * @summary Remove a holding
+ */
+export const deleteHolding = async (id: string, options?: RequestInit): Promise<DeleteHolding200> => {
+
+  return customFetch<DeleteHolding200>(getDeleteHoldingUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteHoldingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteHolding>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteHolding>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteHolding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteHolding>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteHolding(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteHoldingMutationResult = NonNullable<Awaited<ReturnType<typeof deleteHolding>>>
+
+    export type DeleteHoldingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a holding
+ */
+export const useDeleteHolding = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteHolding>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteHolding>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteHoldingMutationOptions(options));
+    }
+
+export const getGetHoldingQuoteUrl = (ticker: string,) => {
+
+
+
+
+  return `/api/holdings/quote/${ticker}`
+}
+
+/**
+ * @summary Live quote lookup for a ticker
+ */
+export const getHoldingQuote = async (ticker: string, options?: RequestInit): Promise<GetHoldingQuote200> => {
+
+  return customFetch<GetHoldingQuote200>(getGetHoldingQuoteUrl(ticker),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHoldingQuoteQueryKey = (ticker: string,) => {
+    return [
+    `/api/holdings/quote/${ticker}`
+    ] as const;
+    }
+
+
+export const getGetHoldingQuoteQueryOptions = <TData = Awaited<ReturnType<typeof getHoldingQuote>>, TError = ErrorType<unknown>>(ticker: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHoldingQuote>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHoldingQuoteQueryKey(ticker);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHoldingQuote>>> = ({ signal }) => getHoldingQuote(ticker, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: ticker !== null && ticker !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHoldingQuote>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHoldingQuoteQueryResult = NonNullable<Awaited<ReturnType<typeof getHoldingQuote>>>
+export type GetHoldingQuoteQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Live quote lookup for a ticker
+ */
+
+export function useGetHoldingQuote<TData = Awaited<ReturnType<typeof getHoldingQuote>>, TError = ErrorType<unknown>>(
+ ticker: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHoldingQuote>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHoldingQuoteQueryOptions(ticker,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetPerformanceUrl = () => {
 

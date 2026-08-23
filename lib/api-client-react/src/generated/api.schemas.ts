@@ -645,10 +645,20 @@ export const PriceAlertInputDirection = {
   below: 'below',
 } as const;
 
+export type PriceAlertInputKind = typeof PriceAlertInputKind[keyof typeof PriceAlertInputKind];
+
+
+export const PriceAlertInputKind = {
+  price: 'price',
+  rsi_oversold: 'rsi_oversold',
+  rsi_overbought: 'rsi_overbought',
+} as const;
+
 export interface PriceAlertInput {
   ticker: string;
-  direction: PriceAlertInputDirection;
-  price: number;
+  direction?: PriceAlertInputDirection;
+  kind?: PriceAlertInputKind;
+  price?: number;
 }
 
 export interface PriceAlert {
@@ -658,18 +668,60 @@ export interface PriceAlert {
   price: number;
 }
 
+export interface HoldingInput {
+  ticker: string;
+  qty: number;
+  costUsd?: number | null;
+}
+
+export interface HoldingPatchInput {
+  qty?: number;
+  costUsd?: number | null;
+}
+
+export interface HoldingsItem {
+  id?: string;
+  ticker?: string;
+  name?: string | null;
+  qty?: number;
+  costUsd?: number | null;
+  price?: number | null;
+  changePct?: number | null;
+  valueUsd?: number | null;
+  plPct?: number | null;
+}
+
+export type HoldingsResponseTotals = {
+  valueUsd?: number | null;
+  costUsd?: number | null;
+  plPct?: number | null;
+};
+
+export interface HoldingsResponse {
+  items?: HoldingsItem[];
+  totals?: HoldingsResponseTotals;
+}
+
 export type PriceAlertsResponseAlertsItem = {
   id: string;
   ticker: string;
   direction: string;
+  kind?: string;
   price: number;
   lastTriggeredAt?: string | null;
+};
+
+export type PriceAlertsResponseQuota = {
+  used?: number;
+  max?: number;
 };
 
 export interface PriceAlertsResponse {
   alerts: PriceAlertsResponseAlertsItem[];
   telegramConfigured: boolean;
   chatId?: string | null;
+  digestEnabled?: boolean;
+  quota?: PriceAlertsResponseQuota;
 }
 
 export interface WatchlistRemoveResponse {
@@ -1418,5 +1470,37 @@ export type CheckAlerts200 = {
   checked?: number;
   sent?: number;
   checkedAt?: string;
+};
+
+export type ToggleDigestBody = {
+  enabled: boolean;
+};
+
+export type ToggleDigest200 = {
+  ok?: boolean;
+  digestEnabled?: boolean;
+};
+
+export type RunDigestNow200 = {
+  sent?: number;
+};
+
+export type AddHolding200 = {
+  ok?: boolean;
+  id?: string;
+};
+
+export type UpdateHolding200 = {
+  ok?: boolean;
+};
+
+export type DeleteHolding200 = {
+  ok?: boolean;
+};
+
+export type GetHoldingQuote200 = {
+  ticker?: string;
+  name?: string | null;
+  price?: number | null;
 };
 

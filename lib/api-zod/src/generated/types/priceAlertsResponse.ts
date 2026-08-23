@@ -6,9 +6,12 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { PriceAlertsResponseAlertsItem } from './priceAlertsResponseAlertsItem';
+import type { PriceAlertsResponseQuota } from './priceAlertsResponseQuota';
 
 export interface PriceAlertsResponse {
   alerts: PriceAlertsResponseAlertsItem[];
   telegramConfigured: boolean;
   chatId?: string | null;
+  digestEnabled?: boolean;
+  quota?: PriceAlertsResponseQuota;
 }

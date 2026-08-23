@@ -10,22 +10,78 @@ import {
   useCreatePriceAlert,
   useDeletePriceAlert,
   useBindTelegram,
+  useToggleDigest,
   getGetWatchlistSummaryQueryKey,
   getGetCalendarQueryKey,
   getGetPerformanceQueryKey,
   getGetPriceAlertsQueryKey,
 } from "@workspace/api-client-react";
-import { Plus, X, Search, TrendingUp, CalendarDays, Target, BellRing, Trash2 } from "lucide-react";
+import { Plus, X, Search, TrendingUp, CalendarDays, Target, BellRing, Trash2, Send } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, StatusBadge, fmtPct, pctColor, fmtNum, Card } from "@/components/panels";
 import { useAuth } from "@/lib/auth-context";
 
-/** Price alerts + Telegram delivery — requires sign-in. */
+/** Beginner-proof 3-step Telegram connect guide. */
+function TgSteps() {
+  const step = "flex items-start gap-2 text-[11px] font-mono text-muted-foreground";
+  const num =
+    "shrink-0 w-4 h-4 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[9px] font-bold mt-0.5";
+  return (
+    <div className="space-y-1.5 border border-dashed border-border rounded-lg p-3">
+      <div className="text-[10px] font-mono font-bold tracking-wider text-foreground uppercase">
+        Connect Telegram in 3 steps
+      </div>
+      <div className={step}>
+        <span className={num}>1</span>
+        <span>
+          Open{" "}
+          <a
+            href="https://t.me/AssetManagerProBot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2"
+          >
+            t.me/AssetManagerProBot
+          </a>{" "}
+          and press <b>Start</b>.
+        </span>
+      </div>
+      <div className={step}>
+        <span className={num}>2</span>
+        <span>
+          Message{" "}
+          <a
+            href="https://t.me/userinfobot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2"
+          >
+            @userinfobot
+          </a>{" "}
+          to get your numeric <b>Chat ID</b> (it looks like 123456789).
+        </span>
+      </div>
+      <div className={step}>
+        <span className={num}>3</span>
+        <span>Paste the Chat ID above, hit CONNECT &amp; TEST — you&apos;ll get a test message instantly.</span>
+      </div>
+    </div>
+  );
+}
+
+function alertLabel(a: { kind?: string; direction?: string; price?: number }) {
+  if (a.kind === "rsi_oversold") return "RSI < 30 (oversold)";
+  if (a.kind === "rsi_overbought") return "RSI > 70 (overbought)";
+  return `${a.direction === "above" ? "≥" : "≤"} $${fmtNum(a.price)}`;
+}
+
+/** Price/signal alerts + daily digest via Telegram — requires sign-in. */
 function AlertsPanel() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [ticker, setTicker] = React.useState("");
+  const [kind, setKind] = React.useState<"price" | "rsi_oversold" | "rsi_overbought">("price");
   const [direction, setDirection] = React.useState<"above" | "below">("above");
   const [price, setPrice] = React.useState("");
   const [chatId, setChatId] = React.useState("");
@@ -38,29 +94,60 @@ function AlertsPanel() {
   const createMutation = useCreatePriceAlert();
   const deleteMutation = useDeletePriceAlert();
   const bindMutation = useBindTelegram();
+  const digestMutation = useToggleDigest();
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getGetPriceAlertsQueryKey() });
 
   if (!user) {
     return (
-      <Card title="PRICE ALERTS (TELEGRAM)">
+      <Card title="ALERTS & SIGNALS (TELEGRAM)">
         <p className="text-xs font-mono text-muted-foreground">
-          Sign in to create price alerts delivered to Telegram.
+          Sign in to create price &amp; RSI signal alerts delivered to Telegram — plus a free daily digest of your
+          watchlist.
         </p>
       </Card>
     );
   }
 
+  const isRsi = kind !== "price";
+
   return (
-    <Card title="PRICE ALERTS (TELEGRAM)">
+    <Card title="ALERTS & SIGNALS (TELEGRAM)">
       <div className="space-y-4">
+        {data && (
+          <div className="flex items-center justify-between font-mono text-[10px] text-muted-foreground">
+            <span>
+              {data.alerts.length}/{data.quota?.max ?? 25} alerts used
+            </span>
+            {data.chatId && (
+              <button
+                onClick={() =>
+                  digestMutation.mutate(
+                    { data: { enabled: !data.digestEnabled } },
+                    { onSuccess: invalidate },
+                  )
+                }
+                disabled={digestMutation.isPending}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors",
+                  data.digestEnabled
+                    ? "border-primary/30 bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Send className="w-3 h-3" />
+                DAILY DIGEST {data.digestEnabled ? "ON" : "OFF"}
+              </button>
+            )}
+          </div>
+        )}
+
         {data && data.alerts.length > 0 && (
           <ul className="space-y-1.5">
             {data.alerts.map((a) => (
               <li key={a.id} className="flex items-center justify-between bg-secondary/60 rounded-md px-3 py-2 font-mono text-sm">
                 <span>
-                  <b className="text-primary">{a.ticker}</b>{" "}
-                  {a.direction === "above" ? "≥" : "≤"} ${fmtNum(a.price)}
+                  <b className="text-primary">{a.ticker}</b> {alertLabel(a)}
                 </span>
                 <button
                   onClick={() => deleteMutation.mutate({ id: a.id }, { onSuccess: invalidate })}
@@ -77,11 +164,14 @@ function AlertsPanel() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (!ticker.trim()) return;
             const p = Number(price);
-            if (!ticker.trim() || !isFinite(p) || p <= 0) return;
+            if (!isRsi && (!isFinite(p) || p <= 0)) return;
             createMutation.mutate(
               {
-                data: { ticker: ticker.trim().toUpperCase(), direction, price: p },
+                data: isRsi
+                  ? { ticker: ticker.trim().toUpperCase(), kind }
+                  : { ticker: ticker.trim().toUpperCase(), direction, price: p },
               },
               {
                 onSuccess: () => {
@@ -101,20 +191,33 @@ function AlertsPanel() {
             className="w-24 bg-secondary border border-border rounded-md px-2.5 py-2 text-sm font-mono uppercase focus:outline-none focus:border-primary"
           />
           <select
-            value={direction}
-            onChange={(e) => setDirection(e.target.value as "above" | "below")}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as typeof kind)}
             className="bg-secondary border border-border rounded-md px-2 py-2 text-xs font-mono focus:outline-none"
           >
-            <option value="above">ABOVE</option>
-            <option value="below">BELOW</option>
+            <option value="price">PRICE</option>
+            <option value="rsi_oversold">RSI OVERSOLD (&lt;30)</option>
+            <option value="rsi_overbought">RSI OVERBOUGHT (&gt;70)</option>
           </select>
-          <input
-            placeholder="$ PRICE"
-            inputMode="decimal"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="w-28 bg-secondary border border-border rounded-md px-2.5 py-2 text-sm font-mono focus:outline-none focus:border-primary"
-          />
+          {!isRsi && (
+            <>
+              <select
+                value={direction}
+                onChange={(e) => setDirection(e.target.value as "above" | "below")}
+                className="bg-secondary border border-border rounded-md px-2 py-2 text-xs font-mono focus:outline-none"
+              >
+                <option value="above">ABOVE</option>
+                <option value="below">BELOW</option>
+              </select>
+              <input
+                placeholder="$ PRICE"
+                inputMode="decimal"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-28 bg-secondary border border-border rounded-md px-2.5 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+              />
+            </>
+          )}
           <button
             disabled={createMutation.isPending}
             className="flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-md px-3 py-2 font-mono text-xs font-bold hover:bg-primary/20 transition-colors disabled:opacity-50"
@@ -126,6 +229,7 @@ function AlertsPanel() {
         <div className="border-t border-border pt-3 space-y-2">
           {data?.telegramConfigured ? (
             <>
+              {!data.chatId && <TgSteps />}
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   placeholder="TELEGRAM CHAT ID"
@@ -149,18 +253,15 @@ function AlertsPanel() {
                   disabled={bindMutation.isPending || !chatId.trim()}
                   className="font-mono text-xs text-primary hover:underline disabled:opacity-50"
                 >
-                  CONNECT & TEST
+                  CONNECT &amp; TEST
                 </button>
                 {tgMsg && <span className="font-mono text-[11px] text-muted-foreground">{tgMsg}</span>}
               </div>
               {data.chatId && (
                 <div className="text-[10px] font-mono text-muted-foreground">
-                  Bound chat: {data.chatId}
+                  Bound chat: {data.chatId} · digest sent daily around 13:00 UTC · alerts re-check every 15 min.
                 </div>
               )}
-              <div className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
-                Message @userinfobot on Telegram for your numeric chat id. Alerts re-check every 15 min.
-              </div>
             </>
           ) : (
             <div className="text-[10px] font-mono text-muted-foreground">

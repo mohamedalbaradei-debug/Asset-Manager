@@ -103,9 +103,11 @@ export function SidebarAuthBlock() {
     return (
       <div className="flex flex-col gap-2">
         <AuthDialog />
-        <div className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
-          Sign in to save your watchlist & alerts
-        </div>
+        <ul className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed space-y-0.5">
+          <li>· Watchlist &amp; holdings saved privately</li>
+          <li>· 24/7 Telegram price &amp; RSI alerts</li>
+          <li>· Free daily watchlist digest</li>
+        </ul>
       </div>
     );
   }

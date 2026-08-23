@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { startAlertLoop } from "./lib/notify";
+import { startAlertLoop, startDigestLoop } from "./lib/notify";
 
 const rawPort = process.env["PORT"];
 
@@ -32,4 +32,5 @@ app.listen(port, (err) => {
     }, 14 * 60_000).unref();
   }
   startAlertLoop();
+  startDigestLoop();
 });

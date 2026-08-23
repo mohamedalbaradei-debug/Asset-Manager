@@ -737,6 +737,162 @@ paths:
                   checkedAt:
                     type: string
 
+  /alerts/digest:
+    post:
+      operationId: toggleDigest
+      tags: [watchlist]
+      summary: Enable or disable the daily Telegram digest for this account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+              required:
+                - enabled
+      responses:
+        "200":
+          description: New digest state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  digestEnabled:
+                    type: boolean
+
+  /alerts/digest/run:
+    post:
+      operationId: runDigestNow
+      tags: [watchlist]
+      summary: Send the digest immediately (testing)
+      responses:
+        "200":
+          description: Digest send result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent:
+                    type: integer
+
+  /holdings:
+    get:
+      operationId: getHoldings
+      tags: [watchlist]
+      summary: List the user's holdings valued live (USD)
+      responses:
+        "200":
+          description: Holdings with live valuation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HoldingsResponse"
+    post:
+      operationId: addHolding
+      tags: [watchlist]
+      summary: Add a holding (ticker, qty, optional cost basis)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HoldingInput"
+      responses:
+        "200":
+          description: Added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  id:
+                    type: string
+
+  /holdings/{id}:
+    patch:
+      operationId: updateHolding
+      tags: [watchlist]
+      summary: Update quantity and/or cost basis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HoldingPatchInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+    delete:
+      operationId: deleteHolding
+      tags: [watchlist]
+      summary: Remove a holding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /holdings/quote/{ticker}:
+    get:
+      operationId: getHoldingQuote
+      tags: [watchlist]
+      summary: Live quote lookup for a ticker
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quote
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticker:
+                    type: string
+                  name:
+                    type: string
+                    nullable: true
+                  price:
+                    type: number
+                    nullable: true
+
   /performance:
     get:
       operationId: getPerformance
@@ -1973,12 +2129,13 @@ components:
         direction:
           type: string
           enum: [above, below]
+        kind:
+          type: string
+          enum: [price, rsi_oversold, rsi_overbought]
         price:
           type: number
       required:
         - ticker
-        - direction
-        - price
 
     PriceAlert:
       type: object
@@ -1997,6 +2154,77 @@ components:
         - direction
         - price
 
+    HoldingInput:
+      type: object
+      properties:
+        ticker:
+          type: string
+        qty:
+          type: number
+        costUsd:
+          type: number
+          nullable: true
+      required:
+        - ticker
+        - qty
+
+    HoldingPatchInput:
+      type: object
+      properties:
+        qty:
+          type: number
+        costUsd:
+          type: number
+          nullable: true
+
+    HoldingsItem:
+      type: object
+      properties:
+        id:
+          type: string
+        ticker:
+          type: string
+        name:
+          type: string
+          nullable: true
+        qty:
+          type: number
+        costUsd:
+          type: number
+          nullable: true
+        price:
+          type: number
+          nullable: true
+        changePct:
+          type: number
+          nullable: true
+        valueUsd:
+          type: number
+          nullable: true
+        plPct:
+          type: number
+          nullable: true
+
+    HoldingsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/HoldingsItem"
+        totals:
+          type: object
+          properties:
+            valueUsd:
+              type: number
+              nullable: true
+            costUsd:
+              type: number
+              nullable: true
+            plPct:
+              type: number
+              nullable: true
+
     PriceAlertsResponse:
       type: object
       properties:
@@ -2010,6 +2238,8 @@ components:
               ticker:
                 type: string
               direction:
+                type: string
+              kind:
                 type: string
               price:
                 type: number
@@ -2026,6 +2256,15 @@ components:
         chatId:
           type: string
           nullable: true
+        digestEnabled:
+          type: boolean
+        quota:
+          type: object
+          properties:
+            used:
+              type: integer
+            max:
+              type: integer
       required:
         - alerts
         - telegramConfigured

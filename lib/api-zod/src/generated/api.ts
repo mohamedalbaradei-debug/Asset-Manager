@@ -1070,11 +1070,17 @@ export const GetPriceAlertsResponse = zod.object({
   "id": zod.string(),
   "ticker": zod.string(),
   "direction": zod.string(),
+  "kind": zod.string().optional(),
   "price": zod.number(),
   "lastTriggeredAt": zod.string().nullish()
 })),
   "telegramConfigured": zod.boolean(),
-  "chatId": zod.string().nullish()
+  "chatId": zod.string().nullish(),
+  "digestEnabled": zod.boolean().optional(),
+  "quota": zod.object({
+  "used": zod.number().optional(),
+  "max": zod.number().optional()
+}).optional()
 })
 
 
@@ -1083,8 +1089,9 @@ export const GetPriceAlertsResponse = zod.object({
  */
 export const CreatePriceAlertBody = zod.object({
   "ticker": zod.string(),
-  "direction": zod.enum(['above', 'below']),
-  "price": zod.number()
+  "direction": zod.enum(['above', 'below']).optional(),
+  "kind": zod.enum(['price', 'rsi_oversold', 'rsi_overbought']).optional(),
+  "price": zod.number().optional()
 })
 
 export const CreatePriceAlertResponse = zod.object({
@@ -1126,6 +1133,108 @@ export const CheckAlertsResponse = zod.object({
   "checked": zod.number().optional(),
   "sent": zod.number().optional(),
   "checkedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Enable or disable the daily Telegram digest for this account
+ */
+export const ToggleDigestBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const ToggleDigestResponse = zod.object({
+  "ok": zod.boolean().optional(),
+  "digestEnabled": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Send the digest immediately (testing)
+ */
+export const RunDigestNowResponse = zod.object({
+  "sent": zod.number().optional()
+})
+
+
+/**
+ * @summary List the user's holdings valued live (USD)
+ */
+export const GetHoldingsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "ticker": zod.string().optional(),
+  "name": zod.string().nullish(),
+  "qty": zod.number().optional(),
+  "costUsd": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "changePct": zod.number().nullish(),
+  "valueUsd": zod.number().nullish(),
+  "plPct": zod.number().nullish()
+})).optional(),
+  "totals": zod.object({
+  "valueUsd": zod.number().nullish(),
+  "costUsd": zod.number().nullish(),
+  "plPct": zod.number().nullish()
+}).optional()
+})
+
+
+/**
+ * @summary Add a holding (ticker, qty, optional cost basis)
+ */
+export const AddHoldingBody = zod.object({
+  "ticker": zod.string(),
+  "qty": zod.number(),
+  "costUsd": zod.number().nullish()
+})
+
+export const AddHoldingResponse = zod.object({
+  "ok": zod.boolean().optional(),
+  "id": zod.string().optional()
+})
+
+
+/**
+ * @summary Update quantity and/or cost basis
+ */
+export const UpdateHoldingParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateHoldingBody = zod.object({
+  "qty": zod.number().optional(),
+  "costUsd": zod.number().nullish()
+})
+
+export const UpdateHoldingResponse = zod.object({
+  "ok": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Remove a holding
+ */
+export const DeleteHoldingParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteHoldingResponse = zod.object({
+  "ok": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Live quote lookup for a ticker
+ */
+export const GetHoldingQuoteParams = zod.object({
+  "ticker": zod.coerce.string()
+})
+
+export const GetHoldingQuoteResponse = zod.object({
+  "ticker": zod.string().optional(),
+  "name": zod.string().nullish(),
+  "price": zod.number().nullish()
 })
 
 
