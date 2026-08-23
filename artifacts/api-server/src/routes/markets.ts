@@ -12,7 +12,8 @@ import { getGexData } from "../lib/optionsAnalysis";
 import { getLatestNews } from "../lib/newsSentiment";
 import { fetchMacroData, type MacroEntry } from "../lib/fredMacro";
 import { getMarketInternals } from "../lib/marketInternals";
-import { getEtfTracker } from "../lib/etfTracker";
+import { getEtfTracker, getEtfScan } from "../lib/etfTracker";
+import { getAssetCatalog } from "../lib/catalog";
 import { getStockDetail, getStockHistory } from "../lib/stockDetail";
 import { getChokepoints } from "../lib/portwatch";
 import { getPetroleumStatus } from "../lib/petroleum";
@@ -147,6 +148,27 @@ router.get("/news/events", async (req, res): Promise<void> => {
   }
 });
 router.get("/etfs", (req, res) => serve(req, res, etfCache, getEtfTracker));
+
+// Ranked, filterable flat view over the ETF universe (the "explorer").
+router.get("/etfs/scan", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const data = await getEtfScan({
+      sort: typeof req.query.sort === "string" ? req.query.sort : undefined,
+      dir: typeof req.query.dir === "string" ? req.query.dir : undefined,
+      category: typeof req.query.category === "string" ? req.query.category : undefined,
+      q: typeof req.query.q === "string" ? req.query.q : undefined,
+    });
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err }, "ETF scan failed");
+    res.status(500).json({ error: "Failed to scan ETFs" });
+  }
+});
+
+// Curated quick-add catalog: major stocks, ETFs, commodities, FX, crypto, indices.
+router.get("/catalog", (_req: Request, res: Response): void => {
+  res.json(getAssetCatalog());
+});
 
 const chokepointsCache = makeCache<object>(12 * 60 * 60 * 1000);
 const petroleumCache = makeCache<object>(6 * 60 * 60 * 1000);

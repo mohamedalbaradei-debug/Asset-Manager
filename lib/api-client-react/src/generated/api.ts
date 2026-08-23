@@ -26,6 +26,7 @@ import type {
   AiStatus,
   AnalysisInput,
   AnalysisResult,
+  AssetCatalogResponse,
   AuthCredentials,
   AuthMeResponse,
   AuthUserResponse,
@@ -40,13 +41,16 @@ import type {
   DeleteHolding200,
   DeletePriceAlert200,
   ErrorResponse,
+  EtfScanResponse,
   EtfTrackerData,
   EventStudyResult,
   FedData,
   FullUsMacro,
   FxData,
   GetCryptoOptionsParams,
+  GetEtfsScanParams,
   GetHoldingQuote200,
+  GetHoldingsPerformanceParams,
   GetNewsEventStudyParams,
   GetStockHistoryParams,
   GetSymbolSearchParams,
@@ -56,6 +60,7 @@ import type {
   HistoryData,
   HoldingInput,
   HoldingPatchInput,
+  HoldingsPerformanceResponse,
   HoldingsResponse,
   InsidersData,
   LogoutAuth200,
@@ -1421,6 +1426,168 @@ export function useGetEtfTracker<TData = Awaited<ReturnType<typeof getEtfTracker
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetEtfTrackerQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetEtfsScanUrl = (params?: GetEtfsScanParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/etfs/scan?${stringifiedParams}` : `/api/etfs/scan`
+}
+
+/**
+ * Flat ranked view over the curated ETF universe with trailing performance windows, expense ratios and volume. Sort by any performance metric; filter by category and text.
+ * @summary Ranked ETF explorer scan
+ */
+export const getEtfsScan = async (params?: GetEtfsScanParams, options?: RequestInit): Promise<EtfScanResponse> => {
+
+  return customFetch<EtfScanResponse>(getGetEtfsScanUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEtfsScanQueryKey = (params?: GetEtfsScanParams,) => {
+    return [
+    `/api/etfs/scan`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEtfsScanQueryOptions = <TData = Awaited<ReturnType<typeof getEtfsScan>>, TError = ErrorType<unknown>>(params?: GetEtfsScanParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEtfsScan>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEtfsScanQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEtfsScan>>> = ({ signal }) => getEtfsScan(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEtfsScan>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEtfsScanQueryResult = NonNullable<Awaited<ReturnType<typeof getEtfsScan>>>
+export type GetEtfsScanQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Ranked ETF explorer scan
+ */
+
+export function useGetEtfsScan<TData = Awaited<ReturnType<typeof getEtfsScan>>, TError = ErrorType<unknown>>(
+ params?: GetEtfsScanParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEtfsScan>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEtfsScanQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAssetCatalogUrl = () => {
+
+
+
+
+  return `/api/catalog`
+}
+
+/**
+ * @summary Curated quick-add asset catalog
+ */
+export const getAssetCatalog = async ( options?: RequestInit): Promise<AssetCatalogResponse> => {
+
+  return customFetch<AssetCatalogResponse>(getGetAssetCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAssetCatalogQueryKey = () => {
+    return [
+    `/api/catalog`
+    ] as const;
+    }
+
+
+export const getGetAssetCatalogQueryOptions = <TData = Awaited<ReturnType<typeof getAssetCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAssetCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAssetCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAssetCatalog>>> = ({ signal }) => getAssetCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssetCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAssetCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof getAssetCatalog>>>
+export type GetAssetCatalogQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Curated quick-add asset catalog
+ */
+
+export function useGetAssetCatalog<TData = Awaited<ReturnType<typeof getAssetCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAssetCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAssetCatalogQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -3687,6 +3854,91 @@ export const useDeleteHolding = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteHoldingMutationOptions(options));
     }
+
+export const getGetHoldingsPerformanceUrl = (params?: GetHoldingsPerformanceParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/holdings/performance?${stringifiedParams}` : `/api/holdings/performance`
+}
+
+/**
+ * Daily portfolio snapshots rebased to 0% alongside GLD and ^GSPC over the requested window. Snapshots are recorded automatically whenever the portfolio is valued.
+ * @summary Portfolio value over time vs Gold and S&P 500
+ */
+export const getHoldingsPerformance = async (params?: GetHoldingsPerformanceParams, options?: RequestInit): Promise<HoldingsPerformanceResponse> => {
+
+  return customFetch<HoldingsPerformanceResponse>(getGetHoldingsPerformanceUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHoldingsPerformanceQueryKey = (params?: GetHoldingsPerformanceParams,) => {
+    return [
+    `/api/holdings/performance`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetHoldingsPerformanceQueryOptions = <TData = Awaited<ReturnType<typeof getHoldingsPerformance>>, TError = ErrorType<unknown>>(params?: GetHoldingsPerformanceParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHoldingsPerformance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHoldingsPerformanceQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHoldingsPerformance>>> = ({ signal }) => getHoldingsPerformance(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHoldingsPerformance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHoldingsPerformanceQueryResult = NonNullable<Awaited<ReturnType<typeof getHoldingsPerformance>>>
+export type GetHoldingsPerformanceQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Portfolio value over time vs Gold and S&P 500
+ */
+
+export function useGetHoldingsPerformance<TData = Awaited<ReturnType<typeof getHoldingsPerformance>>, TError = ErrorType<unknown>>(
+ params?: GetHoldingsPerformanceParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHoldingsPerformance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHoldingsPerformanceQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetHoldingQuoteUrl = (ticker: string,) => {
 

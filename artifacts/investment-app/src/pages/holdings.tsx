@@ -5,11 +5,14 @@ import {
   useAddHolding,
   useUpdateHolding,
   useDeleteHolding,
+  useGetHoldingsPerformance,
   getGetHoldingsQueryKey,
+  getGetHoldingsPerformanceQueryKey,
 } from "@workspace/api-client-react";
 import { Plus, Trash2, Wallet, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, fmtNum, fmtPct, pctColor, Card } from "@/components/panels";
+import { SymbolInput } from "@/components/symbol-input";
 
 type HoldingItem = {
   id: string;
@@ -22,6 +25,107 @@ type HoldingItem = {
   valueUsd?: number | null;
   plPct?: number | null;
 };
+
+const WINDOWS = [
+  { days: 30, label: "1M" },
+  { days: 90, label: "3M" },
+  { days: 180, label: "6M" },
+  { days: 365, label: "1Y" },
+];
+
+/** Portfolio growth vs Gold (GLD) and S&P 500 (^GSPC), rebased to 0%. */
+function PerfChart() {
+  const [days, setDays] = React.useState(180);
+  const { data } = useGetHoldingsPerformance(
+    { days },
+    {
+      query: {
+        queryKey: getGetHoldingsPerformanceQueryKey({ days }),
+        staleTime: 10 * 60_000,
+        retry: false,
+      },
+    },
+  );
+
+  if (!data || !data.hasPortfolioData) return null;
+
+  const series = data.series ?? [];
+  const W = 560;
+  const H = 170;
+  const PAD = 4;
+  const values = series.flatMap((p) => [p.portfolioPct, p.goldPct, p.spxPct].filter((v): v is number => v != null));
+  if (values.length < 2) return null;
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 0);
+  const x = (i: number) =>
+    series.length > 1 ? PAD + (i / (series.length - 1)) * (W - 2 * PAD) : W / 2;
+  const y = (v: number) => H - PAD - ((v - min) / (max - min || 1)) * (H - 2 * PAD);
+  const path = (key: "portfolioPct" | "goldPct" | "spxPct") => {
+    let started = false;
+    let d = "";
+    series.forEach((p, i) => {
+      const v = p[key];
+      if (v == null) return;
+      d += `${started ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)} `;
+      started = true;
+    });
+    return d.trim();
+  };
+  const summary = data.summary ?? {};
+  const rows: Array<{ label: string; v: number | null; cls: string }> = [
+    { label: "PORTFOLIO", v: summary.portfolioPct ?? null, cls: "text-primary" },
+    { label: "GOLD", v: summary.goldPct ?? null, cls: "text-amber-400" },
+    { label: "S&P 500", v: summary.spxPct ?? null, cls: "text-sky-400" },
+  ];
+
+  return (
+    <section>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <SectionTitle>PERFORMANCE VS GOLD & S&P 500</SectionTitle>
+        <div className="flex gap-1">
+          {WINDOWS.map((w) => (
+            <button
+              key={w.days}
+              onClick={() => setDays(w.days)}
+              className={cn(
+                "px-2.5 py-1 rounded-md border font-mono text-[11px] transition-colors",
+                days === w.days
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {w.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40" preserveAspectRatio="none" role="img" aria-label="Portfolio vs gold and S&P 500 chart">
+          <line x1={PAD} y1={y(0)} x2={W - PAD} y2={y(0)} stroke="currentColor" strokeDasharray="3 4" className="text-border" strokeWidth="1" />
+          <path d={path("goldPct")} fill="none" stroke="#fbbf24" strokeWidth="1.5" opacity="0.9" />
+          <path d={path("spxPct")} fill="none" stroke="#38bdf8" strokeWidth="1.5" opacity="0.9" />
+          <path d={path("portfolioPct")} fill="none" stroke="var(--primary)" strokeWidth="2.25" />
+        </svg>
+
+        <div className="grid grid-cols-3 gap-3 pt-1 border-t border-border">
+          {rows.map((r) => (
+            <div key={r.label}>
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground">
+                <span className={cn("inline-block w-2 h-0.5", r.cls.replace("text-", "bg-"))} />
+                {r.label}
+              </div>
+              <div className={cn("font-mono text-lg font-bold", pctColor(r.v))}>{fmtPct(r.v)}</div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
+          Each line rebased to 0% at its own start of window. Snapshots are recorded daily as you use the app.
+        </p>
+      </div>
+    </section>
+  );
+}
 
 export default function HoldingsPage() {
   const queryClient = useQueryClient();
@@ -66,7 +170,7 @@ export default function HoldingsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      <SectionHeader title="HOLDINGS" />
+      <SectionHeader title="PORTFOLIO" />
 
       {!isPending && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -96,12 +200,12 @@ export default function HoldingsPage() {
 
       {/* Add form */}
       <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-        <input
+        <SymbolInput
           required
-          placeholder="TICKER (AAPL)"
           value={ticker}
-          onChange={(e) => setTicker(e.target.value.toUpperCase())}
-          className="w-36 bg-card border-2 border-border rounded-lg px-3 py-2.5 text-sm font-mono uppercase placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+          onChange={setTicker}
+          placeholder="Search any ticker… AAPL, GC=F, EURUSD=X"
+          className="w-64"
         />
         <input
           required
@@ -199,10 +303,13 @@ export default function HoldingsPage() {
             </div>
           )}
           <p className="mt-3 text-[11px] font-mono text-muted-foreground">
-            Tip: edit quantities inline. Set cost basis to see per-position P/L.
+            Tip: edit quantities inline. Set cost basis to see per-position P/L. Search finds any
+            Yahoo-tracked asset — stocks, ETFs, commodities futures, FX pairs and crypto.
           </p>
         </section>
       )}
+
+      <PerfChart />
     </div>
   );
 }

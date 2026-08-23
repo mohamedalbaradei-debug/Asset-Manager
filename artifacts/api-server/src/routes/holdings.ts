@@ -79,6 +79,15 @@ function routerWith(): IRouter {
       };
     });
 
+    // Track performance over time: upsert today's portfolio value snapshot.
+    if (totalValue > 0) {
+      void pgQuery(
+        `INSERT INTO portfolio_snapshots (user_id, day, total_usd) VALUES ($1, CURRENT_DATE, $2)
+         ON CONFLICT (user_id, day) DO UPDATE SET total_usd = EXCLUDED.total_usd`,
+        [req.user!.id, totalValue],
+      ).catch(() => {});
+    }
+
     res.json({
       items,
       totals: {
@@ -190,6 +199,85 @@ function routerWith(): IRouter {
     } catch {
       res.status(502).json({ error: "quote_failed" });
     }
+  });
+
+  // Portfolio performance over time vs Gold (GLD) and S&P 500 (^GSPC).
+  router.get("/holdings/performance", requireUser, async (req: Request, res: Response): Promise<void> => {
+    if (!hasPg()) {
+      res.status(503).json({ error: "storage_unavailable" });
+      return;
+    }
+    let days = parseInt(String(req.query.days ?? "180"), 10);
+    if (!isFinite(days) || days < 7) days = 180;
+    if (days > 365) days = 365;
+
+    interface SnapRow { day: string; total_usd: number | null }
+    const snaps = await pgQuery<SnapRow>(
+      `SELECT to_char(day,'YYYY-MM-DD') AS day, total_usd FROM portfolio_snapshots
+       WHERE user_id=$1 AND day >= CURRENT_DATE - ($2::int) ORDER BY day ASC`,
+      [req.user!.id, days],
+    );
+    const port = snaps.rows
+      .filter((r) => r.total_usd != null && isFinite(r.total_usd))
+      .map((r) => ({ day: r.day, v: r.total_usd as number }));
+
+    // Benchmark daily closes for the same window.
+    const period1 = Math.floor((Date.now() - days * 86400_000) / 1000);
+    async function closes(sym: string): Promise<Map<string, number>> {
+      const out = new Map<string, number>();
+      try {
+        const res = await yahooFinance.chart(sym, {
+          period1,
+          period2: Math.floor(Date.now() / 1000),
+          interval: "1d",
+        });
+        const r = Array.isArray(res) ? res[0] : res;
+        const quotes = (r as { quotes?: Array<{ date?: string | Date; close?: number | null }> })
+          ?.quotes ?? [];
+        for (const q of quotes) {
+          if (!q?.date || typeof q.close !== "number" || !isFinite(q.close)) continue;
+          out.set(new Date(q.date as string | Date).toISOString().slice(0, 10), q.close);
+        }
+      } catch (err) {
+        req.log?.warn({ err, sym }, "benchmark chart failed");
+      }
+      return out;
+    }
+    const [gold, spx] = await Promise.all([closes("GLD"), closes("^GSPC")]);
+
+    // Rebase each series to its own earliest point in the window (% growth).
+    const rebase = (pts: Array<{ d: string; v: number }>): Map<string, number> => {
+      const m = new Map<string, number>();
+      if (pts.length === 0) return m;
+      const base = pts[0].v;
+      if (!(base > 0)) return m;
+      for (const p of pts) m.set(p.d, ((p.v - base) / base) * 100);
+      return m;
+    };
+    const portIdx = rebase(port.map((p) => ({ d: p.day, v: p.v })));
+    const goldIdx = rebase([...gold.entries()].sort().map(([d, v]) => ({ d, v })));
+    const spxIdx = rebase([...spx.entries()].sort().map(([d, v]) => ({ d, v })));
+
+    const allDays = [...new Set([...portIdx.keys(), ...goldIdx.keys(), ...spxIdx.keys()])].sort();
+    const series = allDays.map((day) => ({
+      day,
+      portfolioPct: portIdx.get(day) ?? null,
+      goldPct: goldIdx.get(day) ?? null,
+      spxPct: spxIdx.get(day) ?? null,
+    }));
+    const lastOf = (m: Map<string, number>) =>
+      m.size > 0 ? ([...m.values()].at(-1) ?? null) : null;
+
+    res.json({
+      days,
+      series,
+      summary: {
+        portfolioPct: lastOf(portIdx),
+        goldPct: lastOf(goldIdx),
+        spxPct: lastOf(spxIdx),
+      },
+      hasPortfolioData: port.length > 0,
+    });
   });
 
   return router;

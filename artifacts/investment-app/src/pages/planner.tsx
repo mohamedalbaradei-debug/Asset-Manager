@@ -6,6 +6,7 @@ import {
   type PlanResponse,
 } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
+import { Link } from "wouter";
 import {
   ResponsiveContainer,
   LineChart,
@@ -16,7 +17,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { Calculator, TrendingUp, Shield, Coins, ListChecks, CircleAlert } from "lucide-react";
-import { SectionHeader } from "@/components/panels";
+import { SectionHeader, fmtPct, pctColor } from "@/components/panels";
 import { cn } from "@/lib/utils";
 
 function BacktestCard({ horizon, risk }: { horizon: PlanRequest["horizon"]; risk: PlanRequest["riskTolerance"] }) {
@@ -289,13 +290,32 @@ export default function PlannerPage() {
                   >
                     <div>
                       <div className="font-mono font-bold">
-                        {e.ticker}
+                        <Link href={`/stocks/${e.ticker}`} className="hover:underline text-primary">
+                          {e.ticker}
+                        </Link>
                         <span className="ml-2 text-xs font-normal text-muted-foreground">
                           {e.name}
                         </span>
                       </div>
-                      <div className="text-[10px] font-mono text-muted-foreground mt-1">
-                        expense ratio {e.expenseRatioPct ?? "?"}%
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          expense ratio {e.expenseRatioPct ?? "?"}%
+                        </span>
+                        {e.perfMonth3 != null && (
+                          <span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary", pctColor(e.perfMonth3))}>
+                            3M {fmtPct(e.perfMonth3)}
+                          </span>
+                        )}
+                        {e.perfYtd != null && (
+                          <span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary", pctColor(e.perfYtd))}>
+                            YTD {fmtPct(e.perfYtd)}
+                          </span>
+                        )}
+                        {e.changePct != null && (
+                          <span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary", pctColor(e.changePct))}>
+                            1D {fmtPct(e.changePct)}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="font-mono text-xl font-bold text-primary shrink-0 ml-3">
@@ -303,6 +323,12 @@ export default function PlannerPage() {
                     </div>
                   </div>
                 ))}
+                <Link
+                  href="/etfs"
+                  className="block text-center bg-card border border-dashed border-border rounded-xl p-3 font-mono text-xs text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                >
+                  EXPLORE ALL {180}+ ETFs →
+                </Link>
               </div>
             </motion.section>
 

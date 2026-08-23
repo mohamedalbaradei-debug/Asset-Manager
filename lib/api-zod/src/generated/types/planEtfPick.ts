@@ -12,4 +12,14 @@ export interface PlanEtfPick {
   assetClass: string;
   percentOfPortfolio: number;
   expenseRatioPct?: number;
+  /** @nullable */
+  changePct?: number | null;
+  /** @nullable */
+  perfMonth1?: number | null;
+  /** @nullable */
+  perfMonth3?: number | null;
+  /** @nullable */
+  perfYtd?: number | null;
+  /** @nullable */
+  perfYear?: number | null;
 }

@@ -20,7 +20,50 @@ import { Plus, X, Search, TrendingUp, CalendarDays, Target, BellRing, Trash2, Se
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, StatusBadge, fmtPct, pctColor, fmtNum, Card } from "@/components/panels";
+import { useSymbolSuggestions } from "@/components/symbol-input";
 import { useAuth } from "@/lib/auth-context";
+
+/** Watchlist add-form with live symbol autocomplete for any tradable asset. */
+function WatchlistAddForm({ onSubmit }: { onSubmit: (t: string) => void }) {
+  const [value, setValue] = React.useState("");
+  const { options, listId } = useSymbolSuggestions(value);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const t = value.trim();
+        if (!t) return;
+        onSubmit(t);
+        setValue("");
+      }}
+      className="relative group max-w-md"
+    >
+      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value.toUpperCase())}
+        list={listId}
+        placeholder="ADD ANY ASSET — AAPL, SPY, GLD…"
+        className="w-full bg-card border-2 border-border rounded-lg py-3 pl-11 pr-16 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:border-primary uppercase transition-all"
+      />
+      <datalist id={listId}>
+        {options.slice(0, 8).map((o) => (
+          <option key={o.symbol} value={o.symbol}>
+            {o.name ?? o.symbol}
+          </option>
+        ))}
+      </datalist>
+      <button
+        type="submit"
+        disabled={!value.trim()}
+        className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-primary-foreground p-1.5 rounded-md disabled:opacity-50 hover:bg-primary/90 transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+      </button>
+    </form>
+  );
+}
 
 /** Beginner-proof 3-step Telegram connect guide. */
 function TgSteps() {
@@ -86,6 +129,7 @@ function AlertsPanel() {
   const [price, setPrice] = React.useState("");
   const [chatId, setChatId] = React.useState("");
   const [tgMsg, setTgMsg] = React.useState<string | null>(null);
+  const alertSuggestions = useSymbolSuggestions(ticker);
 
   const enabled = Boolean(user);
   const { data } = useGetPriceAlerts({
@@ -187,9 +231,17 @@ function AlertsPanel() {
           <input
             placeholder="TICKER"
             value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            className="w-24 bg-secondary border border-border rounded-md px-2.5 py-2 text-sm font-mono uppercase focus:outline-none focus:border-primary"
+            onChange={(e) => setTicker(e.target.value.toUpperCase())}
+            list={alertSuggestions.listId}
+            className="w-28 bg-secondary border border-border rounded-md px-2.5 py-2 text-sm font-mono uppercase focus:outline-none focus:border-primary"
           />
+          <datalist id={alertSuggestions.listId}>
+            {alertSuggestions.options.slice(0, 8).map((o) => (
+              <option key={o.symbol} value={o.symbol}>
+                {o.name ?? o.symbol}
+              </option>
+            ))}
+          </datalist>
           <select
             value={kind}
             onChange={(e) => setKind(e.target.value as typeof kind)}
@@ -276,7 +328,6 @@ function AlertsPanel() {
 
 export default function WatchlistPage() {
   const queryClient = useQueryClient();
-  const [newTicker, setNewTicker] = React.useState("");
 
   const { data, isPending, isError } = useGetWatchlistSummary({
     query: { queryKey: getGetWatchlistSummaryQueryKey() },
@@ -296,15 +347,6 @@ export default function WatchlistPage() {
     queryClient.invalidateQueries({ queryKey: getGetPerformanceQueryKey() });
   };
 
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTicker.trim()) return;
-    addMutation.mutate(
-      { data: { ticker: newTicker.trim().toUpperCase() } },
-      { onSuccess: () => { setNewTicker(""); invalidate(); } }
-    );
-  };
-
   const handleRemove = (ticker: string) => {
     removeMutation.mutate(
       { ticker },
@@ -319,23 +361,14 @@ export default function WatchlistPage() {
       {isError && <ErrorState message="Could not load watchlist." />}
 
       {/* Add form */}
-      <form onSubmit={handleAdd} className="relative group max-w-md">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-        <input
-          type="text"
-          value={newTicker}
-          onChange={(e) => setNewTicker(e.target.value)}
-          placeholder="ADD TICKER (AAPL)..."
-          className="w-full bg-card border-2 border-border rounded-lg py-3 pl-11 pr-16 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:border-primary uppercase transition-all"
-        />
-        <button
-          type="submit"
-          disabled={!newTicker.trim() || addMutation.isPending}
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-primary-foreground p-1.5 rounded-md disabled:opacity-50 hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </form>
+      <WatchlistAddForm
+        onSubmit={(t) =>
+          addMutation.mutate(
+            { data: { ticker: t.toUpperCase() } },
+            { onSuccess: invalidate },
+          )
+        }
+      />
 
       {data && (
         <section>

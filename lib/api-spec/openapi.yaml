@@ -278,6 +278,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/EtfTrackerData"
 
+  /etfs/scan:
+    get:
+      operationId: getEtfsScan
+      tags: [panels]
+      summary: Ranked ETF explorer scan
+      description: >
+        Flat ranked view over the curated ETF universe with trailing
+        performance windows, expense ratios and volume. Sort by any
+        performance metric; filter by category and text.
+      parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [changePct, perfWeek, perfMonth1, perfMonth3, perfMonth6, perfYtd, perfYear, perf3Year, volume, expenseRatioPct]
+        - name: dir
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ranked ETF list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EtfScanResponse"
+
+  /catalog:
+    get:
+      operationId: getAssetCatalog
+      tags: [panels]
+      summary: Curated quick-add asset catalog
+      responses:
+        "200":
+          description: Grouped catalog of popular stocks, ETFs, commodities, indices, FX and crypto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetCatalogResponse"
+
   /stocks/{symbol}/detail:
     get:
       operationId: getStockDetail
@@ -864,6 +913,29 @@ paths:
                 properties:
                   ok:
                     type: boolean
+
+  /holdings/performance:
+    get:
+      operationId: getHoldingsPerformance
+      tags: [watchlist]
+      summary: Portfolio value over time vs Gold and S&P 500
+      description: >
+        Daily portfolio snapshots rebased to 0% alongside GLD and ^GSPC over
+        the requested window. Snapshots are recorded automatically whenever
+        the portfolio is valued.
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 180
+      responses:
+        "200":
+          description: Rebased performance series and end-of-window summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HoldingsPerformanceResponse"
 
   /holdings/quote/{ticker}:
     get:
@@ -2517,6 +2589,16 @@ components:
           type: number
         expenseRatioPct:
           type: number
+        changePct:
+          type: ["number", "null"]
+        perfMonth1:
+          type: ["number", "null"]
+        perfMonth3:
+          type: ["number", "null"]
+        perfYtd:
+          type: ["number", "null"]
+        perfYear:
+          type: ["number", "null"]
       required:
         - ticker
         - name
@@ -2641,6 +2723,133 @@ components:
       required:
         - category
         - etfs
+
+    EtfScanItem:
+      type: object
+      properties:
+        ticker:
+          type: string
+        name:
+          type: ["string", "null"]
+        category:
+          type: string
+        price:
+          type: ["number", "null"]
+        changePct:
+          type: ["number", "null"]
+        perfWeek:
+          type: ["number", "null"]
+        perfMonth1:
+          type: ["number", "null"]
+        perfMonth3:
+          type: ["number", "null"]
+        perfMonth6:
+          type: ["number", "null"]
+        perfYtd:
+          type: ["number", "null"]
+        perfYear:
+          type: ["number", "null"]
+        perf3Year:
+          type: ["number", "null"]
+        expenseRatioPct:
+          type: ["number", "null"]
+        volume:
+          type: ["number", "null"]
+      required:
+        - ticker
+        - category
+
+    EtfScanResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EtfScanItem"
+        updatedAt:
+          type: string
+      required:
+        - items
+        - updatedAt
+
+    CatalogAsset:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+      required:
+        - symbol
+        - name
+
+    CatalogGroup:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogAsset"
+      required:
+        - id
+        - label
+        - assets
+
+    AssetCatalogResponse:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogGroup"
+      required:
+        - groups
+
+    HoldingsPerformancePoint:
+      type: object
+      properties:
+        day:
+          type: string
+        portfolioPct:
+          type: ["number", "null"]
+        goldPct:
+          type: ["number", "null"]
+        spxPct:
+          type: ["number", "null"]
+      required:
+        - day
+
+    HoldingsPerformanceSummary:
+      type: object
+      properties:
+        portfolioPct:
+          type: ["number", "null"]
+        goldPct:
+          type: ["number", "null"]
+        spxPct:
+          type: ["number", "null"]
+
+    HoldingsPerformanceResponse:
+      type: object
+      properties:
+        days:
+          type: integer
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/HoldingsPerformancePoint"
+        summary:
+          $ref: "#/components/schemas/HoldingsPerformanceSummary"
+        hasPortfolioData:
+          type: boolean
+      required:
+        - days
+        - series
+        - hasPortfolioData
 
     EtfTrackerData:
       type: object

@@ -571,6 +571,53 @@ export const GetEtfTrackerResponse = zod.object({
 
 
 /**
+ * Flat ranked view over the curated ETF universe with trailing performance windows, expense ratios and volume. Sort by any performance metric; filter by category and text.
+ * @summary Ranked ETF explorer scan
+ */
+export const GetEtfsScanQueryParams = zod.object({
+  "sort": zod.enum(['changePct', 'perfWeek', 'perfMonth1', 'perfMonth3', 'perfMonth6', 'perfYtd', 'perfYear', 'perf3Year', 'volume', 'expenseRatioPct']).optional(),
+  "dir": zod.enum(['asc', 'desc']).optional(),
+  "category": zod.coerce.string().optional(),
+  "q": zod.coerce.string().optional()
+})
+
+export const GetEtfsScanResponse = zod.object({
+  "items": zod.array(zod.object({
+  "ticker": zod.string(),
+  "name": zod.string().nullish(),
+  "category": zod.string(),
+  "price": zod.number().nullish(),
+  "changePct": zod.number().nullish(),
+  "perfWeek": zod.number().nullish(),
+  "perfMonth1": zod.number().nullish(),
+  "perfMonth3": zod.number().nullish(),
+  "perfMonth6": zod.number().nullish(),
+  "perfYtd": zod.number().nullish(),
+  "perfYear": zod.number().nullish(),
+  "perf3Year": zod.number().nullish(),
+  "expenseRatioPct": zod.number().nullish(),
+  "volume": zod.number().nullish()
+})),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Curated quick-add asset catalog
+ */
+export const GetAssetCatalogResponse = zod.object({
+  "groups": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "assets": zod.array(zod.object({
+  "symbol": zod.string(),
+  "name": zod.string()
+}))
+}))
+})
+
+
+/**
  * Quote stats from Yahoo chart meta, fundamentals from the TradingView scanner, five fiscal years of financial statements from SEC EDGAR XBRL and a corporate profile parsed from Wikipedia.
  * @summary OpenAlice-style stock detail bundle
  */
@@ -1225,6 +1272,33 @@ export const DeleteHoldingResponse = zod.object({
 
 
 /**
+ * Daily portfolio snapshots rebased to 0% alongside GLD and ^GSPC over the requested window. Snapshots are recorded automatically whenever the portfolio is valued.
+ * @summary Portfolio value over time vs Gold and S&P 500
+ */
+export const getHoldingsPerformanceQueryDaysDefault = 180;
+
+export const GetHoldingsPerformanceQueryParams = zod.object({
+  "days": zod.coerce.number().default(getHoldingsPerformanceQueryDaysDefault)
+})
+
+export const GetHoldingsPerformanceResponse = zod.object({
+  "days": zod.number(),
+  "series": zod.array(zod.object({
+  "day": zod.string(),
+  "portfolioPct": zod.number().nullish(),
+  "goldPct": zod.number().nullish(),
+  "spxPct": zod.number().nullish()
+})),
+  "summary": zod.object({
+  "portfolioPct": zod.number().nullish(),
+  "goldPct": zod.number().nullish(),
+  "spxPct": zod.number().nullish()
+}).optional(),
+  "hasPortfolioData": zod.boolean()
+})
+
+
+/**
  * @summary Live quote lookup for a ticker
  */
 export const GetHoldingQuoteParams = zod.object({
@@ -1310,7 +1384,12 @@ export const CreateInvestmentPlanResponse = zod.object({
   "name": zod.string(),
   "assetClass": zod.string(),
   "percentOfPortfolio": zod.number(),
-  "expenseRatioPct": zod.number().optional()
+  "expenseRatioPct": zod.number().optional(),
+  "changePct": zod.number().nullish(),
+  "perfMonth1": zod.number().nullish(),
+  "perfMonth3": zod.number().nullish(),
+  "perfYtd": zod.number().nullish(),
+  "perfYear": zod.number().nullish()
 })),
   "projections": zod.array(zod.object({
   "years": zod.number(),

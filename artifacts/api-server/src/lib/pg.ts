@@ -118,6 +118,13 @@ async function ensureSchema(pool: import("pg").Pool): Promise<void> {
       chat_id TEXT NOT NULL,
       digest_enabled BOOLEAN NOT NULL DEFAULT true
     );
+    CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      day DATE NOT NULL,
+      total_usd DOUBLE PRECISION,
+      PRIMARY KEY (user_id, day)
+    );
+    CREATE INDEX IF NOT EXISTS portfolio_snapshots_user_idx ON portfolio_snapshots (user_id, day);
   `);
   // Migrations for tables created before these columns existed.
   await pool.query(`

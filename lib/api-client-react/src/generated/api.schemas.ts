@@ -894,6 +894,16 @@ export interface PlanEtfPick {
   assetClass: string;
   percentOfPortfolio: number;
   expenseRatioPct?: number;
+  /** @nullable */
+  changePct?: number | null;
+  /** @nullable */
+  perfMonth1?: number | null;
+  /** @nullable */
+  perfMonth3?: number | null;
+  /** @nullable */
+  perfYtd?: number | null;
+  /** @nullable */
+  perfYear?: number | null;
 }
 
 export interface PlanProjection {
@@ -978,6 +988,81 @@ export interface EtfQuote {
 export interface EtfCategoryGroup {
   category: string;
   etfs: EtfQuote[];
+}
+
+export interface EtfScanItem {
+  ticker: string;
+  /** @nullable */
+  name?: string | null;
+  category: string;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  changePct?: number | null;
+  /** @nullable */
+  perfWeek?: number | null;
+  /** @nullable */
+  perfMonth1?: number | null;
+  /** @nullable */
+  perfMonth3?: number | null;
+  /** @nullable */
+  perfMonth6?: number | null;
+  /** @nullable */
+  perfYtd?: number | null;
+  /** @nullable */
+  perfYear?: number | null;
+  /** @nullable */
+  perf3Year?: number | null;
+  /** @nullable */
+  expenseRatioPct?: number | null;
+  /** @nullable */
+  volume?: number | null;
+}
+
+export interface EtfScanResponse {
+  items: EtfScanItem[];
+  updatedAt: string;
+}
+
+export interface CatalogAsset {
+  symbol: string;
+  name: string;
+}
+
+export interface CatalogGroup {
+  id: string;
+  label: string;
+  assets: CatalogAsset[];
+}
+
+export interface AssetCatalogResponse {
+  groups: CatalogGroup[];
+}
+
+export interface HoldingsPerformancePoint {
+  day: string;
+  /** @nullable */
+  portfolioPct?: number | null;
+  /** @nullable */
+  goldPct?: number | null;
+  /** @nullable */
+  spxPct?: number | null;
+}
+
+export interface HoldingsPerformanceSummary {
+  /** @nullable */
+  portfolioPct?: number | null;
+  /** @nullable */
+  goldPct?: number | null;
+  /** @nullable */
+  spxPct?: number | null;
+}
+
+export interface HoldingsPerformanceResponse {
+  days: number;
+  series: HoldingsPerformancePoint[];
+  summary?: HoldingsPerformanceSummary;
+  hasPortfolioData: boolean;
 }
 
 export interface EtfTrackerData {
@@ -1361,6 +1446,37 @@ export type GetSymbolSearchParams = {
 q: string;
 };
 
+export type GetEtfsScanParams = {
+sort?: GetEtfsScanSort;
+dir?: GetEtfsScanDir;
+category?: string;
+q?: string;
+};
+
+export type GetEtfsScanSort = typeof GetEtfsScanSort[keyof typeof GetEtfsScanSort];
+
+
+export const GetEtfsScanSort = {
+  changePct: 'changePct',
+  perfWeek: 'perfWeek',
+  perfMonth1: 'perfMonth1',
+  perfMonth3: 'perfMonth3',
+  perfMonth6: 'perfMonth6',
+  perfYtd: 'perfYtd',
+  perfYear: 'perfYear',
+  perf3Year: 'perf3Year',
+  volume: 'volume',
+  expenseRatioPct: 'expenseRatioPct',
+} as const;
+
+export type GetEtfsScanDir = typeof GetEtfsScanDir[keyof typeof GetEtfsScanDir];
+
+
+export const GetEtfsScanDir = {
+  asc: 'asc',
+  desc: 'desc',
+} as const;
+
 export type GetStockHistoryParams = {
 range?: GetStockHistoryRange;
 /**
@@ -1496,6 +1612,10 @@ export type UpdateHolding200 = {
 
 export type DeleteHolding200 = {
   ok?: boolean;
+};
+
+export type GetHoldingsPerformanceParams = {
+days?: number;
 };
 
 export type GetHoldingQuote200 = {
