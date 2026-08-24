@@ -104,6 +104,9 @@ export function SidebarAuthBlock() {
       <div className="flex flex-col gap-2">
         <AuthDialog />
         <ul className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed space-y-0.5">
+          <li>· AI Research Analyst report &amp; chat on any stock</li>
+          <li>· Options &amp; GEX gamma-walls, flow &amp; Greeks</li>
+          <li>· Strategy backtests &amp; portfolio stress tests</li>
           <li>· Watchlist &amp; holdings saved privately</li>
           <li>· 24/7 Telegram price &amp; RSI alerts</li>
           <li>· Free daily watchlist digest</li>
@@ -118,7 +121,7 @@ export function SidebarAuthBlock() {
         <div className="text-xs font-mono text-foreground/80 truncate" title={user.email}>
           {user.email}
         </div>
-        {user.tier === "premium" && (
+        {user && (
           <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider bg-gradient-to-r from-amber-400 to-yellow-200 text-black">
             ★ PREMIUM
           </span>

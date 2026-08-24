@@ -52,6 +52,13 @@ router.post("/analyze", async (req, res): Promise<void> => {
 
   try {
     const result = await analyzeStock(ticker);
+    // The AI Research Analyst report + chat is a premium (logged-in) feature.
+    if (!(req as { user?: unknown }).user) {
+      (result as { aiReport?: unknown }).aiReport = {
+        available: false,
+        note: "Sign in to unlock the full AI Research Analyst report and chat.",
+      };
+    }
     res.json(AnalyzeStockResponse.parse(result));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Analysis failed";

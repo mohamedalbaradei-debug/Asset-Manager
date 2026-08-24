@@ -12,6 +12,8 @@ import {
 import { GexPanel } from "./gex";
 import { SectionHeader, LoadingState, ErrorState, DataTile, Card } from "@/components/panels";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import { AuthDialog } from "@/components/auth-dialog";
 
 const RANGES = ["1D", "5D", "1M", "3M", "1Y", "5Y", "ALL"] as const;
 type Range = (typeof RANGES)[number];
@@ -504,7 +506,30 @@ function useTickerGex(symbol: string) {
 }
 
 function OptionsGexSection({ symbol }: { symbol: string }) {
+  const { user } = useAuth();
   const { data, loading, error } = useTickerGex(symbol);
+
+  if (!user) {
+    return (
+      <section className="space-y-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider">Options &amp; GEX Net Flow</h2>
+        <div className="bg-card border border-border rounded-xl p-6 text-center space-y-3">
+          <div className="text-3xl">🔒</div>
+          <p className="text-sm font-mono text-muted-foreground max-w-md mx-auto leading-relaxed">
+            Options flow, gamma exposure (GEX) and Greeks are a Premium feature. Sign in to unlock.
+          </p>
+          <div className="flex justify-center">
+            <AuthDialog>
+              <button className="bg-primary text-primary-foreground font-mono font-bold rounded-md px-4 py-2 text-sm hover:bg-primary/90 transition-colors">
+                SIGN IN TO UNLOCK
+              </button>
+            </AuthDialog>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex items-baseline justify-between">

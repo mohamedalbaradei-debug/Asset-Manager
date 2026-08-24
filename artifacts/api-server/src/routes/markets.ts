@@ -13,6 +13,7 @@ import { getLatestNews } from "../lib/newsSentiment";
 import { fetchMacroData, type MacroEntry } from "../lib/fredMacro";
 import { getMarketInternals } from "../lib/marketInternals";
 import { getEtfTracker, getEtfScan } from "../lib/etfTracker";
+import { requireUser } from "../lib/auth";
 import { getAssetCatalog } from "../lib/catalog";
 import { getStockDetail, getStockHistory } from "../lib/stockDetail";
 import { getChokepoints } from "../lib/portwatch";
@@ -95,7 +96,7 @@ router.get("/gex", async (req, res): Promise<void> => {
 
 // Per-ticker GEX + options flow + greeks (used by the stock-detail page).
 const tickerGexCache = new Map<string, { t: number; v: unknown }>();
-router.get("/stocks/:symbol/gex", async (req, res): Promise<void> => {
+router.get("/stocks/:symbol/gex", requireUser, async (req, res): Promise<void> => {
   const symbol = String(req.params.symbol).toUpperCase();
   const cached = tickerGexCache.get(symbol);
   if (cached && Date.now() - cached.t < 10 * 60 * 1000) {
