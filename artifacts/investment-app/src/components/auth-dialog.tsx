@@ -1,5 +1,5 @@
 import React from "react";
-import { LogIn, LogOut, Loader2 } from "lucide-react";
+import { LogIn, LogOut, Loader2, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
+
+const PREMIUM_BENEFITS = [
+  "AI Research Analyst report & chat on any stock",
+  "Insider Activity — SEC Form 4 filings",
+  "Options & GEX gamma-walls, flow and Greeks",
+  "Crypto options chains & flow",
+  "Strategy backtests & portfolio stress tests",
+  "Personal watchlist & holdings, synced across devices",
+  "24/7 Telegram price & RSI alerts",
+  "Free daily watchlist digest",
+];
 
 export function AuthDialog({ children }: { children?: React.ReactNode }) {
   const { login, register } = useAuth();
@@ -79,6 +90,19 @@ export function AuthDialog({ children }: { children?: React.ReactNode }) {
             {mode === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
           </button>
         </form>
+        <div className="border-t border-border pt-4 mt-1">
+          <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-foreground mb-2">
+            Sign in (free) to become a Premium member &amp; unlock:
+          </div>
+          <ul className="space-y-1.5">
+            {PREMIUM_BENEFITS.map((b) => (
+              <li key={b} className="flex items-start gap-2 text-xs font-mono text-muted-foreground">
+                <Check className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+                <span className="leading-relaxed">{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
         <button
           onClick={() => setMode(mode === "login" ? "register" : "login")}
           className="text-xs font-mono text-muted-foreground hover:text-primary transition-colors w-full text-center"

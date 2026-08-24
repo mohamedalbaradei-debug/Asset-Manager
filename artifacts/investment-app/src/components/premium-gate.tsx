@@ -26,3 +26,21 @@ export function PremiumGate({ children, feature }: { children: React.ReactNode; 
     </div>
   );
 }
+
+export function PremiumSectionLock({ feature }: { feature: string }) {
+  return (
+    <section className="bg-card border border-border rounded-xl p-6 text-center space-y-3">
+      <div className="text-2xl">🔒</div>
+      <p className="text-sm font-mono text-muted-foreground max-w-md mx-auto leading-relaxed">
+        {feature} is a Premium feature. Sign in (it's free) to unlock it.
+      </p>
+      <div className="flex justify-center">
+        <AuthDialog>
+          <button className="bg-primary text-primary-foreground font-mono font-bold rounded-md px-4 py-2 text-sm hover:bg-primary/90 transition-colors">
+            SIGN IN
+          </button>
+        </AuthDialog>
+      </div>
+    </section>
+  );
+}

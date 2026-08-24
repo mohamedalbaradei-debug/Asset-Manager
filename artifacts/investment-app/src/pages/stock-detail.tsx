@@ -13,6 +13,7 @@ import { GexPanel } from "./gex";
 import { SectionHeader, LoadingState, ErrorState, DataTile, Card } from "@/components/panels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { PremiumSectionLock } from "@/components/premium-gate";
 import { AuthDialog } from "@/components/auth-dialog";
 
 const RANGES = ["1D", "5D", "1M", "3M", "1Y", "5Y", "ALL"] as const;
@@ -171,6 +172,7 @@ export default function StockDetailPage() {
   const params = useParams();
   const [, navigate] = useLocation();
   const routeSymbol = (params.symbol ?? "AAPL").toUpperCase();
+  const { user } = useAuth();
 
   const [input, setInput] = useState(routeSymbol);
   const [range, setRange] = useState<Range>("1Y");
@@ -181,7 +183,7 @@ export default function StockDetailPage() {
 
   const { data: d, isPending, isError } = useGetStockDetail(routeSymbol);
   const { data: insiders } = useGetStockInsiders(routeSymbol, {
-    query: { queryKey: ["getStockInsiders", routeSymbol] },
+    query: { queryKey: ["getStockInsiders", routeSymbol], enabled: !!user },
   });
 
   if (isPending)
@@ -399,7 +401,8 @@ export default function StockDetailPage() {
       </section>
 
       {/* Insider activity */}
-      {insiders && insiders.trades.length > 0 && (
+      {user ? (
+        insiders && insiders.trades.length > 0 && (
         <section className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
@@ -439,6 +442,9 @@ export default function StockDetailPage() {
             </table>
           </div>
         </section>
+        )
+      ) : (
+        <PremiumSectionLock feature="Insider Activity — SEC Form 4" />
       )}
 
       <OptionsGexSection symbol={routeSymbol} />

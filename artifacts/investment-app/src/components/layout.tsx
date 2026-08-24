@@ -63,7 +63,7 @@ const navGroups: NavGroup[] = [
       { href: "/spyqqq", label: "SPY vs QQQ", icon: GitCompareArrows },
       { href: "/gex", label: "GEX & Options Flow", icon: Sigma, premium: true },
       { href: "/calendar", label: "Market Calendar", icon: CalendarDays },
-      { href: "/crypto", label: "Crypto Options", icon: Bitcoin },
+      { href: "/crypto", label: "Crypto Options", icon: Bitcoin, premium: true },
     ],
   },
   {

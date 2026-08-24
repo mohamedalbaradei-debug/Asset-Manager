@@ -4,7 +4,9 @@ import { useAuth } from "@/lib/auth-context";
 
 const PREMIUM_BENEFITS = [
   "AI Research Analyst report & chat on any stock",
+  "Insider Activity — SEC Form 4 filings",
   "Options & GEX gamma-walls, flow and Greeks",
+  "Crypto options chains & flow",
   "Strategy backtests & portfolio stress tests",
   "Personal watchlist & holdings, synced across devices",
   "24/7 Telegram price & RSI alerts",
@@ -107,10 +109,10 @@ export default function LoginPage() {
       </div>
 
       <div className="bg-secondary/40 border border-border rounded-xl p-6">
-        <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-3">
           <LogIn className="w-4 h-4 text-primary" />
           <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-foreground">
-            Why sign up — Premium benefits
+            Sign in (free) to become a Premium member &amp; unlock:
           </h2>
         </div>
         <ul className="space-y-2">

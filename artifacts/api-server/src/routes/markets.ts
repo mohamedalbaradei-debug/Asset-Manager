@@ -207,7 +207,7 @@ const cryptoOptionsCache = makeCache<object>(10 * 60 * 1000);
 
 router.get("/shipping/chokepoints", (req, res) => serve(req, res, chokepointsCache, getChokepoints));
 router.get("/petroleum", (req, res) => serve(req, res, petroleumCache, getPetroleumStatus));
-router.get("/crypto/options", async (req, res): Promise<void> => {  try {
+router.get("/crypto/options", requireUser, async (req, res): Promise<void> => {  try {
     const currency = typeof req.query.currency === "string" ? req.query.currency : "BTC";
     const data = await getCryptoOptions(currency); // lib-level per-currency cache
     res.json(data);
@@ -255,7 +255,7 @@ router.get("/stocks/:symbol/history", async (req, res) => {
   }
 });
 
-router.get("/stocks/:symbol/insiders", async (req, res): Promise<void> => {
+router.get("/stocks/:symbol/insiders", requireUser, async (req, res): Promise<void> => {
   const key = String(req.params.symbol ?? "").toUpperCase().trim();
   if (!key) {
     res.status(400).json({ error: "symbol is required" });

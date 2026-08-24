@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, EmptyNote } from "@/components/panels";
+import { PremiumGate } from "@/components/premium-gate";
 
 const fmtNum = (v: number | null | undefined) =>
   v != null ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(v) : "—";
@@ -113,6 +114,7 @@ export default function CryptoOptionsPage() {
   }, [expiry]);
 
   return (
+    <PremiumGate feature="Crypto Options">
     <div className="max-w-7xl mx-auto space-y-6">
       <SectionHeader title={`CRYPTO_OPTIONS_${data?.currency ?? currency}`} updatedAt={data?.updatedAt} />
 
@@ -213,8 +215,9 @@ export default function CryptoOptionsPage() {
               </div>
             </section>
           )}
-        </>
+        </> 
       )}
     </div>
+    </PremiumGate>
   );
 }
