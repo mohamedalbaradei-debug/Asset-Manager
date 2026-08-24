@@ -25,7 +25,16 @@ function toYears(expiration: Date, now: Date): number {
   return Math.max((expiration.getTime() - now.getTime()) / (365 * 24 * 3600 * 1000), 1 / (365 * 24));
 }
 
+// Index option chains on Yahoo are now degraded (single expiration, zero OI/IV),
+// so prefer CBOE's delayed chain for indices. Equities still try Yahoo first.
+const INDEX_TICKERS = new Set(["SPX", "VIX", "NDX", "RUT", "XSP"]);
+
 async function fetchChain(ticker: string) {
+  const isIndex = INDEX_TICKERS.has(ticker.replace(/^\^/, "").toUpperCase());
+  if (isIndex) {
+    const cboe = await fetchChainCboe(ticker);
+    if (cboe) return cboe;
+  }
   try {
     const data = await yahooFinance.options(ticker);
     const spot = (data.quote?.regularMarketPrice as number | undefined) ?? null;
@@ -34,7 +43,13 @@ async function fetchChain(ticker: string) {
       calls: OptionContract[];
       puts: OptionContract[];
     }>;
-    if (options.length > 0) return { data, spot, options };
+    // Yahoo sometimes returns a degenerate chain (one expiration, zero OI) for
+    // indices — fall through to CBOE in that case.
+    const hasRealChain =
+      options.length > 0 &&
+      options.some((o) => (o.calls.some((c) => (c.openInterest ?? 0) > 0) || o.puts.some((p) => (p.openInterest ?? 0) > 0)));
+    if (hasRealChain) return { data, spot, options };
+    if (!isIndex) logger.warn({ ticker, expirations: options.length }, "Yahoo chain looks degenerate, trying CBOE");
   } catch (err) {
     logger.warn({ err, ticker }, "Yahoo options fetch failed, trying CBOE");
   }
@@ -57,7 +72,7 @@ async function fetchChainCboe(tickerRaw: string) {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
         Accept: "application/json",
       },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(35000),
     });
     if (!res.ok) {
       logger.warn({ status: res.status, ticker }, "CBOE chain request failed");
