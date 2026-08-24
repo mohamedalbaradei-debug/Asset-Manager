@@ -131,5 +131,6 @@ async function ensureSchema(pool: import("pg").Pool): Promise<void> {
     ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'price';
     ALTER TABLE telegram_chats ADD COLUMN IF NOT EXISTS digest_enabled BOOLEAN NOT NULL DEFAULT true;
     UPDATE price_alerts SET kind='price' WHERE kind IS NULL;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'free';
   `);
 }

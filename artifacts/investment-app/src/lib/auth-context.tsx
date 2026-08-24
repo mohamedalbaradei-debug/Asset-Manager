@@ -12,7 +12,7 @@ import {
   getGetPriceAlertsQueryKey,
 } from "@workspace/api-client-react";
 
-export type SessionUser = { id: string; email: string };
+export type SessionUser = { id: string; email: string; tier?: "free" | "premium" };
 
 type AuthCtx = {
   user: SessionUser | null;

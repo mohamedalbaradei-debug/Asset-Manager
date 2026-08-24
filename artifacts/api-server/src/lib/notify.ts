@@ -100,10 +100,12 @@ export async function checkPriceAlerts(): Promise<{ checked: number; sent: numbe
   if (alerts.length === 0) return { checked: 0, sent: 0 };
 
   const priceTickers = [...new Set(alerts.filter((a) => (a.kind ?? "price") === "price").map((a) => a.ticker))];
-  const rsiTickers = [...new Set(alerts.filter((a) => (a.kind ?? "price") !== "price").map((a) => a.ticker))];
+  const rsiTickers = [...new Set(alerts.filter((a) => (a.kind ?? "price").startsWith("rsi_")).map((a) => a.ticker))];
+  const perfTickers = [...new Set(alerts.filter((a) => (a.kind ?? "price").startsWith("perf_")).map((a) => a.ticker))];
 
   let quoteMap = new Map<string, { price: number | null; name: string | null }>();
   let rsis = new Map<string, number>();
+  let perfMap = new Map<string, number>();
   try {
     if (priceTickers.length > 0) {
       const quotes = await yahooFinance.quote(priceTickers);
@@ -117,6 +119,13 @@ export async function checkPriceAlerts(): Promise<{ checked: number; sent: numbe
       }
     }
     if (rsiTickers.length > 0) rsis = await rsiMap(rsiTickers);
+    if (perfTickers.length > 0) {
+      const { getEtfScan } = await import("./etfTracker");
+      const { items } = await getEtfScan({});
+      for (const it of items) {
+        if (it.perfMonth3 != null && isFinite(it.perfMonth3)) perfMap.set(it.ticker, it.perfMonth3);
+      }
+    }
   } catch (err) {
     logger.warn({ err }, "alert quote fetch failed");
     return { checked: alerts.length, sent: 0 };
@@ -131,6 +140,11 @@ export async function checkPriceAlerts(): Promise<{ checked: number; sent: numbe
       if (px == null || !isFinite(px)) continue;
       hit = a.direction === "above" ? px > a.price : px < a.price;
       detail = `$${px.toFixed(2)} is ${a.direction} your alert level $${Number(a.price).toFixed(2)}`;
+    } else if (kind.startsWith("perf_")) {
+      const perf = perfMap.get(a.ticker);
+      if (perf == null) continue; // not in the tracked ETF universe
+      hit = kind === "perf_3m_above" ? perf > a.price : perf < -Math.abs(a.price);
+      detail = `3M performance ${perf >= 0 ? "+" : ""}${perf.toFixed(1)}% ${kind === "perf_3m_above" ? `crossed above +${Number(a.price).toFixed(0)}%` : `dropped below -${Number(a.price).toFixed(0)}%`} — momentum alert`;
     } else {
       const rsi = rsis.get(a.ticker);
       if (rsi == null) continue;

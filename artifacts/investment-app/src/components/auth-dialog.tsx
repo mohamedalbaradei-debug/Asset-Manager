@@ -114,8 +114,15 @@ export function SidebarAuthBlock() {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="text-xs font-mono text-foreground/80 truncate" title={user.email}>
-        {user.email}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-mono text-foreground/80 truncate" title={user.email}>
+          {user.email}
+        </div>
+        {user.tier === "premium" && (
+          <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider bg-gradient-to-r from-amber-400 to-yellow-200 text-black">
+            ★ PREMIUM
+          </span>
+        )}
       </div>
       <button
         onClick={() => void logout()}

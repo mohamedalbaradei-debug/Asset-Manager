@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { requireUser } from "../lib/auth";
 import { hasPg, pgQuery } from "../lib/pg";
 import { yahooFinance } from "../lib/yahoo";
+import { limitsFor, quotaPayload } from "../lib/tiers";
 import type { IRouter } from "express";
 
 /**
@@ -122,8 +123,8 @@ function routerWith(): IRouter {
       "SELECT count(*)::int AS n FROM user_holdings WHERE user_id=$1",
       [req.user!.id],
     );
-    if ((count.rows[0]?.n ?? 0) >= 100) {
-      res.status(400).json({ error: "quota_reached" });
+    if ((count.rows[0]?.n ?? 0) >= limitsFor(req.user).holdings) {
+      res.status(403).json(quotaPayload(count.rows[0]?.n ?? 0, limitsFor(req.user).holdings));
       return;
     }
     const id = `h_${crypto.randomUUID()}`;
@@ -210,6 +211,12 @@ function routerWith(): IRouter {
     let days = parseInt(String(req.query.days ?? "180"), 10);
     if (!isFinite(days) || days < 7) days = 180;
     if (days > 365) days = 365;
+    const perfMax = limitsFor(req.user).performanceMaxDays;
+    let clamped = false;
+    if (days > perfMax) {
+      days = perfMax;
+      clamped = true;
+    }
 
     interface SnapRow { day: string; total_usd: number | null }
     const snaps = await pgQuery<SnapRow>(
@@ -270,6 +277,7 @@ function routerWith(): IRouter {
 
     res.json({
       days,
+      clamped,
       series,
       summary: {
         portfolioPct: lastOf(portIdx),

@@ -2175,6 +2175,9 @@ components:
           type: string
         email:
           type: string
+        tier:
+          type: string
+          enum: [free, premium]
       required:
         - id
         - email
@@ -2203,7 +2206,7 @@ components:
           enum: [above, below]
         kind:
           type: string
-          enum: [price, rsi_oversold, rsi_overbought]
+          enum: [price, rsi_oversold, rsi_overbought, perf_3m_above, perf_3m_below]
         price:
           type: number
       required:
@@ -2838,6 +2841,8 @@ components:
       properties:
         days:
           type: integer
+        clamped:
+          type: boolean
         series:
           type: array
           items:

@@ -10,6 +10,7 @@ import type { HoldingsPerformanceSummary } from './holdingsPerformanceSummary';
 
 export interface HoldingsPerformanceResponse {
   days: number;
+  clamped?: boolean;
   series: HoldingsPerformancePoint[];
   summary?: HoldingsPerformanceSummary;
   hasPortfolioData: boolean;

@@ -8,9 +8,10 @@ import {
   removeFromUserWatchlist,
   getWinRate,
 } from "../lib/storage";
-import { hasPg } from "../lib/pg";
+import { hasPg, pgQuery } from "../lib/pg";
 import { getCalendar } from "../lib/calendar";
 import { getWatchlistSummary } from "../lib/equityPanels";
+import { limitsFor, quotaPayload } from "../lib/tiers";
 
 const router: IRouter = Router();
 
@@ -37,6 +38,18 @@ router.post("/watchlist", async (req: Request, res: Response): Promise<void> => 
   if (!ticker) {
     res.status(400).json({ error: "ticker is required" });
     return;
+  }
+  // Logged-in users are subject to the tier watchlist cap.
+  if (req.user && hasPg()) {
+    const limit = limitsFor(req.user).watchlist;
+    const { rows } = await pgQuery<{ n: number }>(
+      "SELECT count(*)::int AS n FROM user_watchlist WHERE user_id=$1",
+      [req.user.id],
+    );
+    if ((rows[0]?.n ?? 0) >= limit) {
+      res.status(403).json(quotaPayload(rows[0]?.n ?? 0, limit));
+      return;
+    }
   }
   try {
     const result =

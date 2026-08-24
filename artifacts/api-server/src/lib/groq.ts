@@ -355,35 +355,52 @@ export async function chatWithProvider(req: ChatRequest): Promise<ChatReply> {
   }
 }
 
-// ── Free message quota (bot's own Groq key) ─────────────────────────────────
+// ── Server-key message quota (tier-based per user + global cost cap) ───────
 
-const FREE_DAILY_LIMIT = 5;
+const GLOBAL_DAILY_CAP = 200; // hard ceiling protecting the shared key
 const freeCounter = new Map<string, number>();
 
-export function getFreeQuota(): { configured: boolean; remaining: number; limit: number } {
+interface QuotaUser {
+  id: string;
+  tier?: string;
+}
+
+function aiDailyLimit(user?: QuotaUser | null): number {
+  if (user?.tier === "premium") return Number(process.env.PREMIUM_AI_DAILY_LIMIT) || 50;
+  return Number(process.env.FREE_AI_DAILY_LIMIT) || 5;
+}
+
+export function getFreeQuota(user?: QuotaUser | null): { configured: boolean; remaining: number; limit: number } {
   const day = new Date().toISOString().slice(0, 10);
-  const used = freeCounter.get(day) ?? 0;
+  const limit = aiDailyLimit(user);
+  const used = freeCounter.get(`${day}:${user?.id ?? "anon"}`) ?? 0;
   return {
     configured: freeProvider() !== null,
-    remaining: Math.max(0, FREE_DAILY_LIMIT - used),
-    limit: FREE_DAILY_LIMIT,
+    remaining: Math.max(0, limit - used),
+    limit,
   };
 }
 
 export async function freeGroqChat(
   systemPrompt: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  user?: QuotaUser | null
 ): Promise<{ ok: boolean; content?: string; error?: string }> {
-  const quota = getFreeQuota();
+  const quota = getFreeQuota(user);
   if (!quota.configured) {
     return { ok: false, error: "The bot's free AI key is not configured. Add your own key to chat." };
   }
   if (quota.remaining <= 0) {
-    return { ok: false, error: "You've used today's free AI messages. Add your own key to keep chatting." };
+    return { ok: false, error: "You've used today's AI messages on the server key. Add your own key to keep chatting." };
   }
 
   const day = new Date().toISOString().slice(0, 10);
-  freeCounter.set(day, (freeCounter.get(day) ?? 0) + 1);
+  const globalUsed = freeCounter.get(day) ?? 0;
+  if (globalUsed >= GLOBAL_DAILY_CAP) {
+    return { ok: false, error: "Server AI capacity reached for today — try again tomorrow or use your own key." };
+  }
+  freeCounter.set(day, globalUsed + 1);
+  freeCounter.set(`${day}:${user?.id ?? "anon"}`, (freeCounter.get(`${day}:${user?.id ?? "anon"}`) ?? 0) + 1);
 
   const cfg = getFreeAiConfig();
   if (!cfg) {

@@ -13,4 +13,6 @@ export const PriceAlertInputKind = {
   price: 'price',
   rsi_oversold: 'rsi_oversold',
   rsi_overbought: 'rsi_overbought',
+  perf_3m_above: 'perf_3m_above',
+  perf_3m_below: 'perf_3m_below',
 } as const;

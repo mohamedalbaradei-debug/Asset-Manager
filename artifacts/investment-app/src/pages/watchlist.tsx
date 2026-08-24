@@ -116,6 +116,8 @@ function TgSteps() {
 function alertLabel(a: { kind?: string; direction?: string; price?: number }) {
   if (a.kind === "rsi_oversold") return "RSI < 30 (oversold)";
   if (a.kind === "rsi_overbought") return "RSI > 70 (overbought)";
+  if (a.kind === "perf_3m_above") return `3M perf ≥ +${fmtNum(a.price)}%`;
+  if (a.kind === "perf_3m_below") return `3M perf ≤ -${fmtNum(a.price)}%`;
   return `${a.direction === "above" ? "≥" : "≤"} $${fmtNum(a.price)}`;
 }
 
@@ -124,7 +126,7 @@ function AlertsPanel() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [ticker, setTicker] = React.useState("");
-  const [kind, setKind] = React.useState<"price" | "rsi_oversold" | "rsi_overbought">("price");
+  const [kind, setKind] = React.useState<"price" | "rsi_oversold" | "rsi_overbought" | "perf_3m_above" | "perf_3m_below">("price");
   const [direction, setDirection] = React.useState<"above" | "below">("above");
   const [price, setPrice] = React.useState("");
   const [chatId, setChatId] = React.useState("");
@@ -153,7 +155,8 @@ function AlertsPanel() {
     );
   }
 
-  const isRsi = kind !== "price";
+  const isRsi = kind !== "price" && !kind.startsWith("perf_");
+  const isPerf = kind.startsWith("perf_");
 
   return (
     <Card title="ALERTS & SIGNALS (TELEGRAM)">
@@ -213,7 +216,7 @@ function AlertsPanel() {
             if (!isRsi && (!isFinite(p) || p <= 0)) return;
             createMutation.mutate(
               {
-                data: isRsi
+                data: isRsi || isPerf
                   ? { ticker: ticker.trim().toUpperCase(), kind }
                   : { ticker: ticker.trim().toUpperCase(), direction, price: p },
               },
@@ -250,19 +253,23 @@ function AlertsPanel() {
             <option value="price">PRICE</option>
             <option value="rsi_oversold">RSI OVERSOLD (&lt;30)</option>
             <option value="rsi_overbought">RSI OVERBOUGHT (&gt;70)</option>
+            <option value="perf_3m_above">3M PERF ABOVE +%</option>
+            <option value="perf_3m_below">3M PERF BELOW -%</option>
           </select>
           {!isRsi && (
             <>
-              <select
-                value={direction}
-                onChange={(e) => setDirection(e.target.value as "above" | "below")}
-                className="bg-secondary border border-border rounded-md px-2 py-2 text-xs font-mono focus:outline-none"
-              >
-                <option value="above">ABOVE</option>
-                <option value="below">BELOW</option>
-              </select>
+              {kind === "price" && (
+                <select
+                  value={direction}
+                  onChange={(e) => setDirection(e.target.value as "above" | "below")}
+                  className="bg-secondary border border-border rounded-md px-2 py-2 text-xs font-mono focus:outline-none"
+                >
+                  <option value="above">ABOVE</option>
+                  <option value="below">BELOW</option>
+                </select>
+              )}
               <input
-                placeholder="$ PRICE"
+                placeholder={isPerf ? "% THRESHOLD" : "$ PRICE"}
                 inputMode="decimal"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}

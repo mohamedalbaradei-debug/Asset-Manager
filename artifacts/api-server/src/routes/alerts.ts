@@ -5,11 +5,12 @@ import { logger } from "../lib/logger";
 import { requireUser } from "../lib/auth";
 import { hasPg, pgQuery } from "../lib/pg";
 import { tgSend, checkPriceAlerts, runDigestNow } from "../lib/notify";
+import { limitsFor, quotaPayload } from "../lib/tiers";
 
 const router: IRouter = Router();
 
-/** Free-tier alert quota — enforcement exists so paid tiers can raise it later. */
-export const MAX_ALERTS_PER_USER = 25;
+/** Alert kinds — perf kinds compare 3-month total change against `price` %. */
+export const ALERT_KINDS = ["price", "rsi_oversold", "rsi_overbought", "perf_3m_above", "perf_3m_below"] as const;
 
 // ── Price + signal alerts (per user) ────────────────────────────────────────
 
@@ -45,7 +46,7 @@ router.get("/alerts/price", requireUser, async (req, res): Promise<void> => {
     telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN),
     chatId: chat.rows[0]?.chat_id ?? null,
     digestEnabled: chat.rows[0]?.digest_enabled ?? false,
-    quota: { used: alerts.rows.length, max: MAX_ALERTS_PER_USER },
+    quota: { used: alerts.rows.length, max: limitsFor(req.user).alerts },
   });
 });
 
@@ -61,14 +62,15 @@ router.post("/alerts/price", requireUser, async (req, res): Promise<void> => {
     res.status(400).json({ error: "invalid_ticker" });
     return;
   }
-  const kind = ["price", "rsi_oversold", "rsi_overbought"].includes(String(body.kind))
+  const kind = (ALERT_KINDS as readonly string[]).includes(String(body.kind))
     ? String(body.kind)
     : "price";
   const dir = body.direction === "below" ? "below" : "above";
 
-  // Signal alerts use fixed RSI thresholds; price alerts need a target price.
+  // Signal alerts use fixed RSI thresholds; price and perf alerts need a
+  // target value (absolute price or 3M-change %).
   let p = 1;
-  if (kind === "price") {
+  if (kind === "price" || kind.startsWith("perf_")) {
     p = Number(body.price);
     if (!isFinite(p) || p <= 0) {
       res.status(400).json({ error: "invalid_price" });
@@ -76,12 +78,13 @@ router.post("/alerts/price", requireUser, async (req, res): Promise<void> => {
     }
   }
 
+  const limits = limitsFor(req.user);
   const count = await pgQuery<{ n: number }>(
     "SELECT count(*)::int AS n FROM price_alerts WHERE user_id=$1",
     [req.user!.id],
   );
-  if ((count.rows[0]?.n ?? 0) >= MAX_ALERTS_PER_USER) {
-    res.status(400).json({ error: "quota_reached" });
+  if ((count.rows[0]?.n ?? 0) >= limits.alerts) {
+    res.status(403).json(quotaPayload(count.rows[0]?.n ?? 0, limits.alerts));
     return;
   }
 

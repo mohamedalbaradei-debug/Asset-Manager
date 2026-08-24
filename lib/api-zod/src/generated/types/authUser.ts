@@ -5,8 +5,10 @@
  * AI Investment Assistant API
  * OpenAPI spec version: 0.2.0
  */
+import type { AuthUserTier } from './authUserTier';
 
 export interface AuthUser {
   id: string;
   email: string;
+  tier?: AuthUserTier;
 }

@@ -3,8 +3,8 @@ import { chatWithProvider, freeGroqChat, getFreeQuota, type ChatMessage } from "
 
 const router: IRouter = Router();
 
-router.get("/ai/status", async (_req: Request, res: Response): Promise<void> => {
-  res.json({ ...getFreeQuota(), updatedAt: new Date().toISOString() });
+router.get("/ai/status", async (req: Request, res: Response): Promise<void> => {
+  res.json({ ...getFreeQuota(req.user), updatedAt: new Date().toISOString() });
 });
 
 router.post("/ai/chat", async (req: Request, res: Response): Promise<void> => {
@@ -34,7 +34,7 @@ router.post("/ai/chat", async (req: Request, res: Response): Promise<void> => {
   // inside the request and is never logged or persisted.
   const usingFree = provider === "free" || !apiKey;
   const reply = usingFree
-    ? await freeGroqChat(systemPrompt ?? "You are an expert investment analyst.", messages)
+    ? await freeGroqChat(systemPrompt ?? "You are an expert investment analyst.", messages, req.user)
     : await chatWithProvider({
         provider: provider as "openai" | "anthropic" | "groq" | "deepseek" | "custom" | "gemini",
         apiKey,

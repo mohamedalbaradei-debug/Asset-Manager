@@ -22,6 +22,7 @@ export * from './authCredentials';
 export * from './authMeResponse';
 export * from './authUser';
 export * from './authUserResponse';
+export * from './authUserTier';
 export * from './backtestPlanBody';
 export * from './backtestPlanBodyHorizon';
 export * from './backtestPlanBodyRiskTolerance';

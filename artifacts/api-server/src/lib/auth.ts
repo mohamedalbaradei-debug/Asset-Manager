@@ -83,13 +83,14 @@ export async function createSession(userId: string): Promise<string> {
   return token;
 }
 
-async function getSessionUser(token: string): Promise<{ id: string; email: string } | null> {
-  const r = await pgQuery<{ id: string; email: string }>(
-    `SELECT u.id, u.email FROM sessions s JOIN users u ON u.id = s.user_id
+async function getSessionUser(token: string): Promise<{ id: string; email: string; tier: string } | null> {
+  const r = await pgQuery<{ id: string; email: string; tier: string }>(
+    `SELECT u.id, u.email, u.tier FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token = $1 AND s.expires_at > now()`,
     [token],
   );
-  return r.rows[0] ?? null;
+  const row = r.rows[0];
+  return row ? { id: row.id, email: row.email, tier: row.tier ?? "free" } : null;
 }
 
 export async function deleteSession(token: string): Promise<void> {

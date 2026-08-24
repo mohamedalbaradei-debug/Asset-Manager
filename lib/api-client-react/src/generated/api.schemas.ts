@@ -624,9 +624,18 @@ export interface AuthCredentials {
   password: string;
 }
 
+export type AuthUserTier = typeof AuthUserTier[keyof typeof AuthUserTier];
+
+
+export const AuthUserTier = {
+  free: 'free',
+  premium: 'premium',
+} as const;
+
 export interface AuthUser {
   id: string;
   email: string;
+  tier?: AuthUserTier;
 }
 
 export interface AuthUserResponse {
@@ -652,6 +661,8 @@ export const PriceAlertInputKind = {
   price: 'price',
   rsi_oversold: 'rsi_oversold',
   rsi_overbought: 'rsi_overbought',
+  perf_3m_above: 'perf_3m_above',
+  perf_3m_below: 'perf_3m_below',
 } as const;
 
 export interface PriceAlertInput {
@@ -1060,6 +1071,7 @@ export interface HoldingsPerformanceSummary {
 
 export interface HoldingsPerformanceResponse {
   days: number;
+  clamped?: boolean;
   series: HoldingsPerformancePoint[];
   summary?: HoldingsPerformanceSummary;
   hasPortfolioData: boolean;

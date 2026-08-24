@@ -1069,7 +1069,8 @@ export const RegisterAuthBody = zod.object({
 export const RegisterAuthResponse = zod.object({
   "user": zod.object({
   "id": zod.string(),
-  "email": zod.string()
+  "email": zod.string(),
+  "tier": zod.enum(['free', 'premium']).optional()
 }).optional()
 })
 
@@ -1085,7 +1086,8 @@ export const LoginAuthBody = zod.object({
 export const LoginAuthResponse = zod.object({
   "user": zod.object({
   "id": zod.string(),
-  "email": zod.string()
+  "email": zod.string(),
+  "tier": zod.enum(['free', 'premium']).optional()
 }).optional()
 })
 
@@ -1104,7 +1106,8 @@ export const LogoutAuthResponse = zod.object({
 export const GetAuthMeResponse = zod.object({
   "user": zod.object({
   "id": zod.string(),
-  "email": zod.string()
+  "email": zod.string(),
+  "tier": zod.enum(['free', 'premium']).optional()
 }).nullish()
 })
 
@@ -1137,7 +1140,7 @@ export const GetPriceAlertsResponse = zod.object({
 export const CreatePriceAlertBody = zod.object({
   "ticker": zod.string(),
   "direction": zod.enum(['above', 'below']).optional(),
-  "kind": zod.enum(['price', 'rsi_oversold', 'rsi_overbought']).optional(),
+  "kind": zod.enum(['price', 'rsi_oversold', 'rsi_overbought', 'perf_3m_above', 'perf_3m_below']).optional(),
   "price": zod.number().optional()
 })
 
@@ -1283,6 +1286,7 @@ export const GetHoldingsPerformanceQueryParams = zod.object({
 
 export const GetHoldingsPerformanceResponse = zod.object({
   "days": zod.number(),
+  "clamped": zod.boolean().optional(),
   "series": zod.array(zod.object({
   "day": zod.string(),
   "portfolioPct": zod.number().nullish(),
