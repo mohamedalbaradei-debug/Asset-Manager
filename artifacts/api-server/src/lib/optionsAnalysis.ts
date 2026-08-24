@@ -314,7 +314,13 @@ export async function getGreeksSnapshot(ticker: string): Promise<GreeksSnapshot>
     const { spot, options } = await fetchChain(ticker);
     if (options.length === 0 || spot == null) return base;
 
-    const nearest = [...options].sort(
+    // Skip zero/near-zero DTE expirations (e.g. contracts expiring today) —
+    // Black-Scholes collapses to intrinsic-only at T≈0 (call delta 0, put
+    // delta ±1, gamma 0), which is mathematically correct but useless.
+    const now = new Date();
+    const meaningful = options.filter((o) => toYears(o.expirationDate, now) >= 1 / 365);
+    const pool = meaningful.length > 0 ? meaningful : options;
+    const nearest = [...pool].sort(
       (a, b) => a.expirationDate.getTime() - b.expirationDate.getTime()
     )[0];
 
@@ -471,7 +477,8 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
     if (options.length === 0 || spot == null) return base;
 
     const now = new Date();
-    const recent = [...options]
+    const meaningfulExps = [...options].filter((o) => toYears(o.expirationDate, now) >= 1 / 365);
+    const recent = (meaningfulExps.length > 0 ? meaningfulExps : [...options])
       .sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime())
       .slice(0, maxExpirations);
 
