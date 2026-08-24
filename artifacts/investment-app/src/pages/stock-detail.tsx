@@ -7,7 +7,9 @@ import {
   type HistoryData,
   type GetStockHistoryInterval,
   type InsiderTrade,
+  type GexData,
 } from "@workspace/api-client-react";
+import { GexPanel } from "./gex";
 import { SectionHeader, LoadingState, ErrorState, DataTile, Card } from "@/components/panels";
 import { cn } from "@/lib/utils";
 
@@ -436,6 +438,150 @@ export default function StockDetailPage() {
           </div>
         </section>
       )}
+
+      <OptionsGexSection symbol={routeSymbol} />
+
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Options & GEX net-flow section. The /stocks/:symbol/gex endpoint is not yet
+// in the generated client types, so we fetch it directly.
+// ---------------------------------------------------------------------------
+interface OptionsFlowView {
+  available: boolean;
+  putCallVolumeRatio: number | null;
+  totalCallVolume: number;
+  totalPutVolume: number;
+  totalOpenInterest: number;
+  unusualActivity: boolean;
+  unusualNote: string | null;
+  premiumFlow: number | null;
+  signal: string;
+  interpretation: string;
+}
+interface GreeksView {
+  available: boolean;
+  spot: number | null;
+  strike: number | null;
+  call: { delta: number; gamma: number; charm: number } | null;
+  put: { delta: number; gamma: number; charm: number } | null;
+  signal: string;
+  signalNote: string;
+}
+interface TickerGexView {
+  gex: (GexData & { callWall?: number | null; putWall?: number | null; signalExplanation?: string }) | null;
+  optionsFlow: OptionsFlowView | null;
+  greeks: GreeksView | null;
+  updatedAt: string;
+}
+
+function useTickerGex(symbol: string) {
+  const [data, setData] = useState<TickerGexView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    fetch(`/api/stocks/${encodeURIComponent(symbol)}/gex`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((j: TickerGexView) => {
+        if (!cancelled) setData(j);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
+  return { data, loading, error };
+}
+
+function OptionsGexSection({ symbol }: { symbol: string }) {
+  const { data, loading, error } = useTickerGex(symbol);
+  return (
+    <section className="space-y-4">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-bold uppercase tracking-wider">Options &amp; GEX Net Flow</h2>
+        {data?.updatedAt && (
+          <span className="text-[10px] font-mono text-muted-foreground">
+            updated {new Date(data.updatedAt).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+
+      {loading && <LoadingState />}
+      {error && (
+        <p className="text-[11px] font-mono text-destructive">
+          Options/GEX data is unavailable for this ticker (no liquid options chain).
+        </p>
+      )}
+
+      {data?.gex?.available && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <GexPanel g={data.gex} title={`${symbol} — GAMMA EXPOSURE`} />
+        </div>
+      )}
+
+      {data?.optionsFlow?.available && (
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <DataTile
+              label="P/C Vol Ratio"
+              value={data.optionsFlow.putCallVolumeRatio != null ? data.optionsFlow.putCallVolumeRatio.toFixed(2) : "—"}
+            />
+            <DataTile label="Call Vol" value={data.optionsFlow.totalCallVolume.toLocaleString("en-US")} />
+            <DataTile label="Put Vol" value={data.optionsFlow.totalPutVolume.toLocaleString("en-US")} />
+            <DataTile label="Total OI" value={data.optionsFlow.totalOpenInterest.toLocaleString("en-US")} />
+            <DataTile label="Net Premium" value={fmtCompact(data.optionsFlow.premiumFlow)} />
+            <DataTile label="Signal" value={data.optionsFlow.signal.toUpperCase()} />
+          </div>
+          <p className="text-xs font-mono text-muted-foreground leading-relaxed">{data.optionsFlow.interpretation}</p>
+          {data.optionsFlow.unusualActivity && (
+            <p className="text-[11px] font-mono text-amber-500 border border-amber-500/30 bg-amber-500/10 rounded-lg px-3 py-2">
+              ⚠ {data.optionsFlow.unusualNote}
+            </p>
+          )}
+          <p className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
+            Beginner note: a put/call volume ratio above ~1.2 means traders are loading puts (bearish hedging); below ~0.8 is call-heavy
+            (bullish). Net premium shows where real money is flowing.
+          </p>
+        </div>
+      )}
+
+      {data?.greeks?.available && (
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
+            Greeks @ ATM
+            {data.greeks.strike != null ? ` · strike $${fmtNum(data.greeks.strike)}` : ""}
+            {data.greeks.spot != null ? ` · spot $${fmtNum(data.greeks.spot)}` : ""}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <DataTile label="Call Δ" value={data.greeks.call?.delta.toFixed(2)} />
+            <DataTile label="Call Γ" value={data.greeks.call?.gamma.toFixed(4)} />
+            <DataTile label="Call Charm" value={data.greeks.call?.charm.toFixed(4)} />
+            <DataTile label="Put Δ" value={data.greeks.put?.delta.toFixed(2)} />
+            <DataTile label="Put Γ" value={data.greeks.put?.gamma.toFixed(4)} />
+            <DataTile label="Put Charm" value={data.greeks.put?.charm.toFixed(4)} />
+          </div>
+          <p className="text-xs font-mono text-muted-foreground leading-relaxed">{data.greeks.signalNote}</p>
+          <p className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
+            Beginner note: Delta ≈ directional exposure (calls +, puts –). Gamma is how fast delta changes — the dealer hedging pressure behind
+            the GEX walls. Negative call charm overnight means dealers tend to sell into the open.
+          </p>
+        </div>
+      )}
+
+      <p className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed border-t border-border pt-3">
+        Dark pool / off-exchange (ATS) flow is not yet sourced — it needs a paid market-data subscription. Everything above is derived from the
+        free public options chain.
+      </p>
+    </section>
   );
 }

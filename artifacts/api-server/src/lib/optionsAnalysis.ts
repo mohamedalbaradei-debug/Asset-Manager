@@ -431,6 +431,12 @@ export interface GexData {
   flowChart?: GexPoint[];
   signal: "bullish" | "bearish" | "neutral";
   explanation: string;
+  /** Strike with the largest positive call gamma (dealers short → upside resistance). */
+  callWall: number | null;
+  /** Strike with the largest negative put gamma (dealers long → downside support). */
+  putWall: number | null;
+  /** Beginner-friendly plain-English reading of the signal + the walls. */
+  signalExplanation: string;
 }
 
 /**
@@ -455,6 +461,9 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
     points: [],
     signal: "neutral",
     explanation: "GEX data is unavailable for this symbol.",
+    callWall: null,
+    putWall: null,
+    signalExplanation: "",
   };
 
   try {
@@ -571,6 +580,30 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
       gammaFlip = best;
     }
 
+    // Call wall = strike with the largest positive call gamma exposure: dealers
+    // are short those calls, so they must sell into strength → upside
+    // resistance. Put wall = strike with the largest negative put gamma
+    // exposure: dealers are long those puts, so they buy into weakness →
+    // downside support.
+    let callWall: number | null = null;
+    let putWall: number | null = null;
+    {
+      let maxCall = -Infinity;
+      let minPut = Infinity;
+      for (const p of points) {
+        if (p.callGex > maxCall) {
+          maxCall = p.callGex;
+          callWall = p.strike;
+        }
+        if (p.putGex < minPut) {
+          minPut = p.putGex;
+          putWall = p.strike;
+        }
+      }
+      if (!isFinite(maxCall) || maxCall <= 0) callWall = null;
+      if (!isFinite(minPut) || minPut >= 0) putWall = null;
+    }
+
     let signal: "bullish" | "bearish" | "neutral";
     let explanation: string;
     if (netGex < 0) {
@@ -589,6 +622,11 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
       signal = "neutral";
       explanation = "Net dealer gamma is near zero — no strong positioning tilt.";
     }
+
+    const signalExplanation =
+      signal === "bearish"
+        ? "Dealers are short gamma / put buying dominates — sharp moves can be amplified in either direction. The call wall above is resistance; the put wall below is support (risk-off / bearish)."
+        : "Dealers are long gamma (or net gamma is flat) — they tend to dampen sharp moves and pin price near high-gamma strikes. The call wall above is resistance; the put wall below is support (neutral).";
 
     // Keep the charts readable: focus on strikes within ±6% of spot and drop
     // sub-pixel noise bars (a few billion-dollar strikes otherwise flatten
@@ -632,6 +670,9 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
       flowChart,
       signal,
       explanation,
+      callWall,
+      putWall,
+      signalExplanation,
     };
   } catch (err) {
     logger.warn({ err, symbol }, "GEX data unavailable");

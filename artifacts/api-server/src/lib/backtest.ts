@@ -11,6 +11,7 @@ export interface BacktestPoint {
   date: string;
   portfolio: number; // indexed to 100 at start
   spy: number | null;
+  gold: number | null;
 }
 
 export interface BacktestResult {
@@ -19,6 +20,7 @@ export interface BacktestResult {
   points: BacktestPoint[];
   cagrPct: number | null;
   spyCagrPct: number | null;
+  goldCagrPct: number | null;
   volPct: number | null;
   maxDrawdownPct: number | null;
   growthOf10kUsd: number | null;
@@ -70,7 +72,7 @@ export async function backtestAllocation(
   const longest = Math.max(...usable.map(() => 10)); // use full common history up to 10y
   void longest;
 
-  const symbols = [...usable.map((e) => e.ticker), "SPY"];
+  const symbols = [...usable.map((e) => e.ticker), "SPY", "GLD"];
   const results = await Promise.allSettled(symbols.map((s) => monthlyCloses(s, 10)));
   const series = new Map<string, Map<string, number>>();
   results.forEach((r, i) => {
@@ -90,13 +92,22 @@ export async function backtestAllocation(
   }
 
   const spyMap = series.get("SPY") ?? null;
+  const goldMap = series.get("GLD") ?? null;
 
   // Monthly returns per component; portfolio = weighted sum each month
   // (equivalent to a monthly-rebalanced portfolio).
-  const points: BacktestPoint[] = [{ date: common[0], portfolio: 100, spy: spyMap?.has(common[0]) ? 100 : null }];
+  const points: BacktestPoint[] = [
+    {
+      date: common[0],
+      portfolio: 100,
+      spy: spyMap?.has(common[0]) ? 100 : null,
+      gold: goldMap?.has(common[0]) ? 100 : null,
+    },
+  ];
   const rets: number[] = [];
   let pv = 100;
   let sv = spyMap && spyMap.has(common[0]) ? 100 : null;
+  let gv = goldMap && goldMap.has(common[0]) ? 100 : null;
   for (let i = 1; i < common.length; i++) {
     const prevM = common[i - 1];
     const curM = common[i];
@@ -117,7 +128,17 @@ export async function backtestAllocation(
       sv *= 1 + (spyMap.get(curM)! / spyMap.get(prevM)! - 1);
       spyPt = sv;
     }
-    points.push({ date: curM, portfolio: Math.round(pv * 100) / 100, spy: spyPt != null ? Math.round(spyPt * 100) / 100 : null });
+    let goldPt: number | null = null;
+    if (gv != null && goldMap?.has(prevM) && goldMap.has(curM)) {
+      gv *= 1 + (goldMap.get(curM)! / goldMap.get(prevM)! - 1);
+      goldPt = gv;
+    }
+    points.push({
+      date: curM,
+      portfolio: Math.round(pv * 100) / 100,
+      spy: spyPt != null ? Math.round(spyPt * 100) / 100 : null,
+      gold: goldPt != null ? Math.round(goldPt * 100) / 100 : null,
+    });
   }
 
   const vol =
@@ -131,6 +152,7 @@ export async function backtestAllocation(
 
   const values = points.map((p) => p.portfolio);
   const spyValues = points.map((p) => p.spy).filter((x): x is number => x != null);
+  const goldValues = points.map((p) => p.gold).filter((x): x is number => x != null);
 
   const out: BacktestResult = {
     etfs: usable,
@@ -138,6 +160,7 @@ export async function backtestAllocation(
     points,
     cagrPct: Math.round((cagr(values, points.length) ?? NaN) * 100) / 100 || null,
     spyCagrPct: spyValues.length > 12 ? Math.round((cagr(spyValues, points.length) ?? NaN) * 100) / 100 || null : null,
+    goldCagrPct: goldValues.length > 12 ? Math.round((cagr(goldValues, points.length) ?? NaN) * 100) / 100 || null : null,
     volPct: vol != null ? Math.round(vol * 100) / 100 : null,
     maxDrawdownPct: maxDrawdown(values) != null ? Math.round(maxDrawdown(values)! * 100) / 100 : null,
     growthOf10kUsd: Math.round(((values[values.length - 1] ?? 100) / 100) * 10000),

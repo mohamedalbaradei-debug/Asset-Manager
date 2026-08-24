@@ -87,7 +87,7 @@ function parseForm4(xml: string): { trades: Array<Omit<InsiderTrade, "filedAt">>
   const trades = txns.map((t) => {
     const code = (tag(t, "transactionCode") ?? "").toUpperCase();
     return {
-      date: tag(t, "transactionDate"),
+      date: tag(t.split("<transactionDate>")[1] ?? "", "value"),
       insider: insider ?? "Unknown",
       role,
       action: ACTION_BY_CODE[code] ?? "other",

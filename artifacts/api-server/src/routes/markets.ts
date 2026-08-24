@@ -8,7 +8,7 @@ import {
   getValuationData,
   getShippingData,
 } from "../lib/macroPanels";
-import { getGexData } from "../lib/optionsAnalysis";
+import { getGexData, analyzeOptionsFlow, getGreeksSnapshot } from "../lib/optionsAnalysis";
 import { getLatestNews } from "../lib/newsSentiment";
 import { fetchMacroData, type MacroEntry } from "../lib/fredMacro";
 import { getMarketInternals } from "../lib/marketInternals";
@@ -90,6 +90,35 @@ router.get("/gex", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "GEX fetch failed");
     res.status(500).json({ error: "Failed to fetch GEX data" });
+  }
+});
+
+// Per-ticker GEX + options flow + greeks (used by the stock-detail page).
+const tickerGexCache = new Map<string, { t: number; v: unknown }>();
+router.get("/stocks/:symbol/gex", async (req, res): Promise<void> => {
+  const symbol = String(req.params.symbol).toUpperCase();
+  const cached = tickerGexCache.get(symbol);
+  if (cached && Date.now() - cached.t < 10 * 60 * 1000) {
+    res.json(cached.v);
+    return;
+  }
+  try {
+    const [gexR, flowR, greeksR] = await Promise.allSettled([
+      getGexData(symbol),
+      analyzeOptionsFlow(symbol),
+      getGreeksSnapshot(symbol),
+    ]);
+    const data = {
+      gex: gexR.status === "fulfilled" ? gexR.value : null,
+      optionsFlow: flowR.status === "fulfilled" ? flowR.value : null,
+      greeks: greeksR.status === "fulfilled" ? greeksR.value : null,
+      updatedAt: new Date().toISOString(),
+    };
+    tickerGexCache.set(symbol, { t: Date.now(), v: data });
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err, symbol }, "Ticker GEX fetch failed");
+    res.status(500).json({ error: "Failed to fetch options/GEX data" });
   }
 });
 

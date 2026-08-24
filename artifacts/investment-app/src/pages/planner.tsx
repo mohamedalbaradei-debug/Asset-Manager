@@ -22,6 +22,14 @@ import { cn } from "@/lib/utils";
 
 function BacktestCard({ horizon, risk }: { horizon: PlanRequest["horizon"]; risk: PlanRequest["riskTolerance"] }) {
   const bt = useBacktestPlan();
+  // Extended view of the backtest result (gold benchmark fields added server-side
+  // but not yet in the generated client types).
+  const d = bt.data as
+    | (typeof bt.data & {
+        goldCagrPct?: number | null;
+        points: Array<{ date: string; portfolio: number; spy: number | null; gold?: number | null }>;
+      })
+    | undefined;
 
   return (
     <motion.section
@@ -32,7 +40,7 @@ function BacktestCard({ horizon, risk }: { horizon: PlanRequest["horizon"]; risk
       <div className="flex items-center justify-between">
         <h2 className="font-mono text-sm font-bold uppercase tracking-wide flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-primary" />
-          Historical Backtest vs SPY
+          Historical Backtest vs SPY &amp; GOLD
         </h2>
         <button
           onClick={() => bt.mutate({ data: { horizon, riskTolerance: risk } })}
@@ -50,15 +58,16 @@ function BacktestCard({ horizon, risk }: { horizon: PlanRequest["horizon"]; risk
         <p className="text-[11px] font-mono text-destructive">Backtest failed — try again.</p>
       )}
 
-      {bt.data && (
+      {d && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             {[
-              ["CAGR", bt.data.cagrPct != null ? `${bt.data.cagrPct.toFixed(1)}%` : "—"],
-              ["SPY CAGR", bt.data.spyCagrPct != null ? `${bt.data.spyCagrPct.toFixed(1)}%` : "—"],
-              ["VOL (ANN.)", bt.data.volPct != null ? `${bt.data.volPct.toFixed(1)}%` : "—"],
-              ["MAX DRAWDOWN", bt.data.maxDrawdownPct != null ? `${bt.data.maxDrawdownPct.toFixed(1)}%` : "—"],
-              ["$10K GREW TO", bt.data.growthOf10kUsd != null ? `$${new Intl.NumberFormat("en-US").format(bt.data.growthOf10kUsd)}` : "—"],
+              ["CAGR", d.cagrPct != null ? `${d.cagrPct.toFixed(1)}%` : "—"],
+              ["SPY CAGR", d.spyCagrPct != null ? `${d.spyCagrPct.toFixed(1)}%` : "—"],
+              ["GOLD CAGR", d.goldCagrPct != null ? `${d.goldCagrPct.toFixed(1)}%` : "—"],
+              ["VOL (ANN.)", d.volPct != null ? `${d.volPct.toFixed(1)}%` : "—"],
+              ["MAX DRAWDOWN", d.maxDrawdownPct != null ? `${d.maxDrawdownPct.toFixed(1)}%` : "—"],
+              ["$10K GREW TO", d.growthOf10kUsd != null ? `$${new Intl.NumberFormat("en-US").format(d.growthOf10kUsd)}` : "—"],
             ].map(([label, value]) => (
               <div key={label} className="border border-border rounded-lg p-3">
                 <div className="text-[10px] font-mono text-muted-foreground uppercase">{label}</div>
@@ -69,7 +78,7 @@ function BacktestCard({ horizon, risk }: { horizon: PlanRequest["horizon"]; risk
 
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={bt.data.points} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <LineChart data={d.points} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={9} tickLine={false} axisLine={false} minTickGap={60} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={9} tickLine={false} axisLine={false} width={40} domain={["auto", "auto"]} />
@@ -80,11 +89,12 @@ function BacktestCard({ horizon, risk }: { horizon: PlanRequest["horizon"]; risk
                 />
                 <Line type="monotone" dataKey="portfolio" stroke="#22c55e" strokeWidth={1.8} dot={false} name="Portfolio" />
                 <Line type="monotone" dataKey="spy" stroke="#71717a" strokeWidth={1.2} dot={false} name="SPY" />
+                <Line type="monotone" dataKey="gold" stroke="#eab308" strokeWidth={1.2} dot={false} name="GOLD" />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">{bt.data.disclaimer}</p>
+          <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">{d.disclaimer}</p>
         </div>
       )}
     </motion.section>

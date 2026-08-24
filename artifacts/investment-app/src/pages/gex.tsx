@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, fmtNum } from "@/components/panels";
 import { VixGauge } from "@/components/VixGauge";
 
-function GexPanel({ g, title }: { g: GexData; title: string }) {
+export function GexPanel({ g, title }: { g: GexData & { callWall?: number | null; putWall?: number | null; signalExplanation?: string }; title: string }) {
   // Each chart renders its own significance-filtered bar set: a strike can
   // carry huge directional flow while its call/put gamma nets to ~zero, so
   // sharing one array leaves invisible slivers on one of the two charts.
@@ -80,6 +80,19 @@ function GexPanel({ g, title }: { g: GexData; title: string }) {
         </div>
       </div>
 
+      {(g.callWall != null || g.putWall != null) && (
+        <div className="flex flex-wrap gap-4">
+          <div className="px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30">
+            <div className="text-[10px] font-mono text-muted-foreground uppercase">Call Wall · Resistance</div>
+            <div className="font-mono text-lg font-bold text-destructive">{g.callWall != null ? `$${fmtNum(g.callWall)}` : "—"}</div>
+          </div>
+          <div className="px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/30">
+            <div className="text-[10px] font-mono text-muted-foreground uppercase">Put Wall · Support</div>
+            <div className="font-mono text-lg font-bold text-green-500">{g.putWall != null ? `$${fmtNum(g.putWall)}` : "—"}</div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="text-xs font-mono text-muted-foreground mb-3">GAMMA EXPOSURE BY STRIKE</div>
@@ -135,6 +148,13 @@ function GexPanel({ g, title }: { g: GexData; title: string }) {
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="text-xs font-mono text-muted-foreground mb-2">INTERPRETATION</div>
         <p className="text-xs font-mono text-muted-foreground leading-relaxed">{g.explanation}</p>
+        {g.signalExplanation && (
+          <p className="text-xs font-mono text-muted-foreground leading-relaxed mt-3 border-t border-border pt-3">{g.signalExplanation}</p>
+        )}
+        <p className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed mt-3">
+          Beginner note: a <span className="text-destructive">call wall</span> is a strike where heavy call gamma makes dealers sell into rallies (resistance); a{" "}
+          <span className="text-green-500">put wall</span> is where heavy put gamma makes dealers buy into drops (support). Price often gravitates between the two.
+        </p>
       </div>
     </section>
   );
