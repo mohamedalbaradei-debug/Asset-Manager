@@ -25,6 +25,13 @@ function toYears(expiration: Date, now: Date): number {
   return Math.max((expiration.getTime() - now.getTime()) / (365 * 24 * 3600 * 1000), 1 / (365 * 24));
 }
 
+// Yahoo/CBOE IV feeds are unreliable (0, 0.1%, 500%+) on many strikes.
+// Sanitize to a sane band and fall back to a flat 18% vol.
+const FALLBACK_IV = 0.18;
+function saneIV(iv: number | null | undefined): number {
+  return typeof iv === "number" && iv >= 0.02 && iv <= 2 ? iv : FALLBACK_IV;
+}
+
 // Index option chains on Yahoo are now degraded (single expiration, zero OI/IV),
 // so prefer CBOE's delayed chain for indices. Equities still try Yahoo first.
 const INDEX_TICKERS = new Set(["SPX", "VIX", "NDX", "RUT", "XSP"]);
@@ -340,21 +347,21 @@ export async function getGreeksSnapshot(ticker: string): Promise<GreeksSnapshot>
     const callContract = nearest.calls.find((c) => c.strike === strike);
     const putContract = nearest.puts.find((p) => p.strike === strike);
 
-    const call = callContract?.impliedVolatility != null
+    const call = callContract
       ? callGreeks({
           spot,
           strike,
           timeToExpiryYears: T,
-          impliedVolatility: callContract.impliedVolatility,
+          impliedVolatility: saneIV(callContract.impliedVolatility),
           riskFreeRate: RISK_FREE_RATE,
         })
       : null;
-    const put = putContract?.impliedVolatility != null
+    const put = putContract
       ? putGreeks({
           spot,
           strike,
           timeToExpiryYears: T,
-          impliedVolatility: putContract.impliedVolatility,
+          impliedVolatility: saneIV(putContract.impliedVolatility),
           riskFreeRate: RISK_FREE_RATE,
         })
       : null;
@@ -489,9 +496,6 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
     // near-dated dailies often report nonsense (0.1% or 500%). Sanitize to a
     // sane band and fall back to a flat 18% vol — the GEX profile shape is
     // driven by the OI distribution, so a flat-vol approximation is standard.
-    const FALLBACK_IV = 0.18;
-    const saneIV = (iv: number | null | undefined): number =>
-      typeof iv === "number" && iv >= 0.02 && iv <= 2 ? iv : FALLBACK_IV;
 
     for (const exp of recent) {
       const T = toYears(exp.expirationDate, now);
