@@ -11,7 +11,12 @@ import { logger } from "./logger";
  */
 
 const GROQ_BASE = "https://api.groq.com/openai/v1";
-const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
+
+/** Strip reasoning blocks (e.g. Qwen's <think>…</think>) from model output. */
+function cleanContent(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
 
 // Google Gemini exposes an OpenAI-compatible endpoint under /v1beta/openai.
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai";
@@ -204,7 +209,7 @@ export async function generateAiReport(ctx: ReportContext): Promise<AiReport> {
       const data = (await res.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
       };
-      const content = data.choices?.[0]?.message?.content ?? null;
+      const content = cleanContent(data.choices?.[0]?.message?.content ?? "");
       if (!content) {
         return {
           available: false,
@@ -297,7 +302,8 @@ async function openAiCompatible(
   }
   const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = data.choices?.[0]?.message?.content;
-  return content ? { ok: true, content } : { ok: false, error: "Empty API response." };
+  const cleaned = content ? cleanContent(content) : null;
+  return cleaned ? { ok: true, content: cleaned } : { ok: false, error: "Empty API response." };
 }
 
 /** Anthropic native messages API. */
