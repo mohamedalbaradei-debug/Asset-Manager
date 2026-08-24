@@ -5,6 +5,7 @@ import {
   useGetPetroleumStatus,
 } from "@workspace/api-client-react";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, DataTile } from "@/components/panels";
+import { VixGauge } from "@/components/VixGauge";
 import { cn } from "@/lib/utils";
 
 const fmtMb = (v: number | null | undefined) =>
@@ -78,6 +79,7 @@ export default function MacroFullPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <SectionHeader title="US_MACRO" updatedAt={data?.updatedAt} />
+      <VixGauge variant="panel" />
       {isPending && <LoadingState />}
       {isError && <ErrorState message="Could not load macro data." />}
       {data && (

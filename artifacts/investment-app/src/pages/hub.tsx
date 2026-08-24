@@ -2,6 +2,7 @@ import React from "react";
 import { Search, Loader2, ArrowUpRight, ArrowDownRight, BarChart3, AlertCircle, Activity, TrendingUp, LineChart as LineChartIcon, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { useAnalyzeStock, useGetTrendingTickers, useGetSymbolSearch, getGetTrendingTickersQueryKey, getGetSymbolSearchQueryKey, type SymbolSearchResult } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
+import { VixGauge } from "@/components/VixGauge";
 import {
   LineChart,
   Line,
@@ -707,7 +708,8 @@ export default function HubPage() {
       </div>
 
       {/* Right Sidebar - Trending */}
-      <div className="w-full lg:w-80 flex-shrink-0">
+      <div className="w-full lg:w-80 flex-shrink-0 space-y-4">
+        <VixGauge variant="sidebar" />
         <div className="bg-card border border-border rounded-xl p-6 sticky top-6">
           <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
             <h2 className="font-mono text-sm font-bold tracking-widest text-muted-foreground">

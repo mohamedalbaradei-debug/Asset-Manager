@@ -21,6 +21,7 @@ import { getCryptoOptions } from "../lib/deribit";
 import { getInsiders } from "../lib/insiders";
 import { collectNews, queryArchive, getEventStudy } from "../lib/newsArchive";
 import { getWatchlist } from "../lib/storage";
+import { yahooFinance } from "../lib/yahoo";
 
 const router: IRouter = Router();
 
@@ -276,6 +277,71 @@ router.get("/marketpulse", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Market pulse fetch failed");
     res.status(500).json({ error: "Failed to build market pulse" });
+  }
+});
+
+// ── VIX "fear gauge" reading ────────────────────────────────────────────────
+const vixCache = makeCache<object>(5 * 60 * 1000);
+
+function classifyVix(v: number | null) {
+  if (v == null)
+    return {
+      signal: "neutral" as const,
+      band: "Unknown",
+      meaning: "VIX data is temporarily unavailable.",
+      hint: "The VIX ('fear gauge') measures expected 30-day volatility of the S&P 500. Try again shortly.",
+    };
+  if (v < 12)
+    return {
+      signal: "bullish" as const,
+      band: "Complacency",
+      meaning: "Investors are extremely calm — fear is historically low.",
+      hint: "A very low VIX means markets expect tiny moves. Calm now, but little room for surprise without a jolt — complacency can precede a shakeout.",
+    };
+  if (v < 15)
+    return {
+      signal: "bullish" as const,
+      band: "Calm",
+      meaning: "Low fear — a healthy, low-volatility backdrop.",
+      hint: "Low VIX = investors expect small swings. Generally supportive for stocks, but watch for building complacency.",
+    };
+  if (v < 20)
+    return {
+      signal: "neutral" as const,
+      band: "Normal",
+      meaning: "Typical volatility — neither fearful nor euphoric.",
+      hint: "This is the 'normal' zone. Markets are functioning normally with no strong fear or greed signal.",
+    };
+  if (v < 30)
+    return {
+      signal: "bearish" as const,
+      band: "Elevated Fear",
+      meaning: "Traders are paying up for protection — worry is rising.",
+      hint: "A rising VIX means expected swings are growing. It often coincides with falling stocks and a 'risk-off' mood.",
+    };
+  return {
+    signal: "bearish" as const,
+    band: "Extreme Fear",
+    meaning: "Markets are stressed — panic or forced selling is likely.",
+    hint: "VIX above 30 has historically marked market stress (crashes, sharp selloffs). Defensive positioning is common.",
+  };
+}
+
+router.get("/vix", async (req: Request, res: Response): Promise<void> => {
+  const cached = vixCache.get();
+  if (cached) {
+    res.json(cached);
+    return;
+  }
+  try {
+    const q = (await yahooFinance.quote("^VIX")) as { regularMarketPrice?: number } | undefined;
+    const vix = q?.regularMarketPrice ?? null;
+    const out = { vix, ...classifyVix(vix), updatedAt: new Date().toISOString() };
+    vixCache.set(out);
+    res.json(out);
+  } catch (err) {
+    req.log.error({ err }, "VIX fetch failed");
+    res.status(502).json({ error: "Failed to load VIX." });
   }
 });
 

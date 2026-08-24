@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, fmtNum } from "@/components/panels";
+import { VixGauge } from "@/components/VixGauge";
 
 function GexPanel({ g, title }: { g: GexData; title: string }) {
   // Each chart renders its own significance-filtered bar set: a strike can
@@ -151,6 +152,7 @@ export default function GexPage() {
       {isError && <ErrorState message="Could not load gamma exposure." />}
       {data && (
         <>
+          <VixGauge variant="panel" />
           <GexPanel g={data.spx} title="S&P 500 (SPX) — GAMMA EXPOSURE" />
           <GexPanel g={data.vix} title="VIX — GAMMA EXPOSURE" />
         </>
