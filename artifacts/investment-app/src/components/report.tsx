@@ -24,6 +24,8 @@ import {
   ArrowDownRight,
   Minus,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type {
   AnalysisResult,
   SentimentReport,
@@ -35,6 +37,15 @@ import type {
 import { useAiChat, useGetAiStatus, getGetAiStatusQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+
+/** Render trusted AI/markdown content (tables, bold, headings) with Tailwind typography. */
+function Markdown({ content, className }: { content: string; className?: string }) {
+  return (
+    <div className={cn("prose prose-sm prose-invert max-w-none break-words", className)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
+  );
+}
 import { StatusBadge } from "@/components/panels";
 
 const fmtCurrency = (val: number) =>
@@ -335,7 +346,7 @@ export function AiReportSection({ aiReport }: { aiReport: AnalysisResult["aiRepo
         data: {
           provider: "free",
           messages: [
-            { role: "system", content: "You are a concise equity research assistant. Reference the ticker context from the analysis report when relevant. Always remind the user this is not financial advice." },
+            { role: "system", content: "You are a concise equity research assistant for this stock. You may discuss bull/bear cases, likely scenarios, catalysts, and probabilities for price direction using the analysis context. Hypotheticals and opinions are welcome. Always end by reminding the user this is educational and not financial advice." },
             ...next.map((m) => ({ role: m.role, content: m.content })),
           ],
         },
@@ -373,8 +384,8 @@ export function AiReportSection({ aiReport }: { aiReport: AnalysisResult["aiRepo
               MODEL: <span className="text-primary">{aiReport.model ?? "unknown"}</span> · {aiReport.provider}
             </div>
           </div>
-          <div className="text-sm font-mono text-foreground leading-relaxed whitespace-pre-wrap">
-            {aiReport.content}
+          <div className="text-foreground leading-relaxed">
+            <Markdown content={aiReport.content} />
           </div>
         </div>
       ) : (
@@ -420,7 +431,7 @@ export function AiReportSection({ aiReport }: { aiReport: AnalysisResult["aiRepo
                     : "bg-secondary text-foreground"
                 )}
               >
-                {m.content}
+                {m.role === "assistant" ? <Markdown content={m.content} /> : m.content}
               </div>
             </div>
           ))}
