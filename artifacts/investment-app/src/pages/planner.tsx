@@ -7,6 +7,8 @@ import {
 } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
+import { useAuth } from "@/lib/auth-context";
+import { PremiumSectionLock } from "@/components/premium-gate";
 import {
   ResponsiveContainer,
   LineChart,
@@ -127,6 +129,7 @@ export default function PlannerPage() {
   const [horizon, setHorizon] = useState<PlanRequest["horizon"]>("long");
   const [risk, setRisk] = useState<PlanRequest["riskTolerance"]>("balanced");
   const [currency, setCurrency] = useState("USD");
+  const { user } = useAuth();
 
   const mutation = useCreateInvestmentPlan();
 
@@ -405,7 +408,11 @@ export default function PlannerPage() {
         </>
       )}
 
-      <BacktestCard horizon={horizon} risk={risk} />
+      {user ? (
+        <BacktestCard horizon={horizon} risk={risk} />
+      ) : (
+        <PremiumSectionLock feature="Historical Backtest vs SPY & GOLD" />
+      )}
     </div>
   );
 }
