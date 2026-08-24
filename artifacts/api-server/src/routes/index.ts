@@ -9,6 +9,7 @@ import planRouter from "./plan";
 import authRouter from "./auth";
 import alertsRouter from "./alerts";
 import holdingsRouter from "./holdings";
+import calendarRouter from "./calendar";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(aiRouter);
 router.use(planRouter);
 router.use(alertsRouter);
 router.use(holdingsRouter);
+router.use(calendarRouter);
 
 export default router;

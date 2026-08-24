@@ -9,6 +9,7 @@ import MoversPage from '@/pages/movers';
 import SectorRotationPage from '@/pages/sector-rotation';
 import SpyQqqPage from '@/pages/spyqqq';
 import GexPage from '@/pages/gex';
+import { CalendarPage } from '@/pages/calendar';
 import CryptoOptionsPage from '@/pages/crypto-options';
 import MacroFullPage from '@/pages/macro-full';
 import GlobalMacroPage from '@/pages/global-macro';
@@ -45,6 +46,7 @@ function Router() {
           <Route path="/sectors" component={SectorRotationPage} />
           <Route path="/spyqqq" component={SpyQqqPage} />
           <Route path="/gex" component={GexPage} />
+          <Route path="/calendar" component={CalendarPage} />
           <Route path="/crypto" component={CryptoOptionsPage} />
           <Route path="/macro" component={MacroFullPage} />
           <Route path="/global" component={GlobalMacroPage} />
