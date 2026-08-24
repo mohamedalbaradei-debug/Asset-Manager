@@ -77,7 +77,7 @@ router.get("/movers", (req, res) => serve(req, res, moversCache, getMarketMovers
 router.get("/sectors", (req, res) => serve(req, res, sectorsCache, getSectorRotation));
 router.get("/spyqqq", (req, res) => serve(req, res, spyqqqCache, getSpyQqqRotation));
 
-router.get("/gex", async (req, res): Promise<void> => {
+router.get("/gex", requireUser, async (req, res): Promise<void> => {
   const cached = gexCache.get();
   if (cached) {
     res.json(cached);

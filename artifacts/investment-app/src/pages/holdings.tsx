@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { Plus, Trash2, Wallet, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PremiumGate } from "@/components/premium-gate";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, fmtNum, fmtPct, pctColor, Card } from "@/components/panels";
 import { SymbolInput } from "@/components/symbol-input";
 
@@ -169,6 +170,7 @@ export default function HoldingsPage() {
   const totals = data?.totals;
 
   return (
+    <PremiumGate feature="My Holdings">
     <div className="max-w-7xl mx-auto space-y-8">
       <SectionHeader title="PORTFOLIO" />
 
@@ -311,5 +313,6 @@ export default function HoldingsPage() {
 
       <PerfChart />
     </div>
+    </PremiumGate>
   );
 }

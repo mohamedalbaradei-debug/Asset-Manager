@@ -23,6 +23,7 @@ import HoldingsPage from '@/pages/holdings';
 import PlannerPage from '@/pages/planner';
 import EtfTrackerPage from '@/pages/etf-tracker';
 import StockDetailPage from '@/pages/stock-detail';
+import LoginPage from '@/pages/login';
 import { Layout } from '@/components/layout';
 import { AuthProvider } from '@/lib/auth-context';
 
@@ -60,6 +61,7 @@ function Router() {
           <Route path="/planner" component={PlannerPage} />
           <Route path="/etfs" component={EtfTrackerPage} />
           <Route path="/stocks/:symbol" component={StockDetailPage} />
+          <Route path="/login" component={LoginPage} />
           <Route component={NotFound} />
         </Switch>
       </Layout>

@@ -12,6 +12,7 @@ import { hasPg, pgQuery } from "../lib/pg";
 import { getCalendar } from "../lib/calendar";
 import { getWatchlistSummary } from "../lib/equityPanels";
 import { limitsFor, quotaPayload } from "../lib/tiers";
+import { requireUser } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -24,7 +25,7 @@ async function resolveWatchlist(req: Request): Promise<{ tickers: string[]; scop
   return { tickers: await getWatchlist(), scoped: false };
 }
 
-router.get("/watchlist", async (req: Request, res: Response): Promise<void> => {
+router.get("/watchlist", requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { tickers } = await resolveWatchlist(req);
     res.json({ watchlist: tickers });
@@ -33,7 +34,7 @@ router.get("/watchlist", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post("/watchlist", async (req: Request, res: Response): Promise<void> => {
+router.post("/watchlist", requireUser, async (req: Request, res: Response): Promise<void> => {
   const ticker = typeof req.body?.ticker === "string" ? req.body.ticker.toUpperCase().trim() : "";
   if (!ticker) {
     res.status(400).json({ error: "ticker is required" });
@@ -62,7 +63,7 @@ router.post("/watchlist", async (req: Request, res: Response): Promise<void> => 
   }
 });
 
-router.delete("/watchlist/:ticker", async (req: Request, res: Response): Promise<void> => {
+router.delete("/watchlist/:ticker", requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const result =
       req.user && hasPg()
@@ -74,7 +75,7 @@ router.delete("/watchlist/:ticker", async (req: Request, res: Response): Promise
   }
 });
 
-router.get("/watchlist/summary", async (req: Request, res: Response): Promise<void> => {
+router.get("/watchlist/summary", requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { tickers: watchlist } = await resolveWatchlist(req);
     const items = await getWatchlistSummary(watchlist);

@@ -19,11 +19,13 @@ import {
   Bitcoin,
   Wallet,
   CalendarDays,
+  LogIn,
   type LucideIcon,
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { SidebarAuthBlock } from "@/components/auth-dialog";
+import { useAuth } from "@/lib/auth-context";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -33,6 +35,8 @@ interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  anonOnly?: boolean;
+  premium?: boolean;
 }
 
 interface NavGroup {
@@ -57,7 +61,7 @@ const navGroups: NavGroup[] = [
       { href: "/movers", label: "Market Movers", icon: TrendingUp },
       { href: "/sectors", label: "Sector Rotation", icon: Layers },
       { href: "/spyqqq", label: "SPY vs QQQ", icon: GitCompareArrows },
-      { href: "/gex", label: "GEX & Options Flow", icon: Sigma },
+      { href: "/gex", label: "GEX & Options Flow", icon: Sigma, premium: true },
       { href: "/calendar", label: "Market Calendar", icon: CalendarDays },
       { href: "/crypto", label: "Crypto Options", icon: Bitcoin },
     ],
@@ -73,18 +77,20 @@ const navGroups: NavGroup[] = [
       { href: "/shipping", label: "Shipping", icon: Ship },
     ],
   },
-  {
-    label: "Info",
-    items: [
-      { href: "/news", label: "News & Pulse", icon: Newspaper },
-      { href: "/watchlist", label: "Watchlist & Calendar", icon: Star },
-      { href: "/holdings", label: "My Holdings", icon: Wallet },
-    ],
-  },
+    {
+      label: "Info",
+      items: [
+        { href: "/news", label: "News & Pulse", icon: Newspaper },
+        { href: "/watchlist", label: "Watchlist & Calendar", icon: Star, premium: true },
+        { href: "/holdings", label: "My Holdings", icon: Wallet, premium: true },
+        { href: "/login", label: "Sign In", icon: LogIn, anonOnly: true },
+      ],
+    },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground flex-col md:flex-row">
@@ -103,8 +109,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="hidden md:block text-[10px] font-mono font-bold tracking-widest text-muted-foreground/60 uppercase px-3 mb-1">
                 {group.label}
               </div>
-              <div className="flex md:flex-col gap-1">
+               <div className="flex md:flex-col gap-1">
                 {group.items.map((item) => {
+                  if (item.anonOnly && user) return null;
+                  if (item.premium && !user) return null;
                   const isActive = location === item.href;
                   const Icon = item.icon;
                   return (

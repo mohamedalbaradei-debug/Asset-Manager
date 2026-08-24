@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, fmtNum } from "@/components/panels";
 import { VixGauge } from "@/components/VixGauge";
+import { PremiumGate } from "@/components/premium-gate";
 
 export function GexPanel({ g, title }: { g: GexData & { callWall?: number | null; putWall?: number | null; signalExplanation?: string }; title: string }) {
   // Each chart renders its own significance-filtered bar set: a strike can
@@ -166,17 +167,19 @@ export default function GexPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto space-y-10">
-      <SectionHeader title="GEX_NET_FLOW" updatedAt={data?.updatedAt} />
-      {isPending && <LoadingState />}
-      {isError && <ErrorState message="Could not load gamma exposure." />}
-      {data && (
-        <>
-          <VixGauge variant="panel" />
-          <GexPanel g={data.spx} title="S&P 500 (SPX) — GAMMA EXPOSURE" />
-          <GexPanel g={data.vix} title="VIX — GAMMA EXPOSURE" />
-        </>
-      )}
-    </div>
+    <PremiumGate feature="GEX & Options Flow">
+      <div className="max-w-7xl mx-auto space-y-10">
+        <SectionHeader title="GEX_NET_FLOW" updatedAt={data?.updatedAt} />
+        {isPending && <LoadingState />}
+        {isError && <ErrorState message="Could not load gamma exposure." />}
+        {data && (
+          <>
+            <VixGauge variant="panel" />
+            <GexPanel g={data.spx} title="S&P 500 (SPX) — GAMMA EXPOSURE" />
+            <GexPanel g={data.vix} title="VIX — GAMMA EXPOSURE" />
+          </>
+        )}
+      </div>
+    </PremiumGate>
   );
 }

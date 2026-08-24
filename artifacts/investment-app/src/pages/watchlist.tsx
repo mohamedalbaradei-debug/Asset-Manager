@@ -19,6 +19,7 @@ import {
 import { Plus, X, Search, TrendingUp, CalendarDays, Target, BellRing, Trash2, Send } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { PremiumGate } from "@/components/premium-gate";
 import { SectionHeader, SectionTitle, LoadingState, ErrorState, StatusBadge, fmtPct, pctColor, fmtNum, Card } from "@/components/panels";
 import { useSymbolSuggestions } from "@/components/symbol-input";
 import { useAuth } from "@/lib/auth-context";
@@ -362,6 +363,7 @@ export default function WatchlistPage() {
   };
 
   return (
+    <PremiumGate feature="Watchlist & Calendar">
     <div className="max-w-7xl mx-auto space-y-8">
       <SectionHeader title="WATCHLIST" updatedAt={data?.updatedAt} />
       {isPending && <LoadingState />}
@@ -529,5 +531,6 @@ export default function WatchlistPage() {
         </Card>
       </div>
     </div>
+    </PremiumGate>
   );
 }
