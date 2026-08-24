@@ -344,6 +344,17 @@ export async function getGreeksSnapshot(ticker: string): Promise<GreeksSnapshot>
     const expiry = nearest.expirationDate;
     const T = toYears(expiry, new Date());
 
+    // If the only available contract expires today (T≈0), Black-Scholes is
+    // degenerate (call delta 0, put delta ±1, gamma 0) — don't surface
+    // misleading zero greeks.
+    if (T < 1 / 365) {
+      return {
+        ...base,
+        explanation:
+          "Only the contract expiring today is listed right now (T≈0); option greeks are not meaningful at expiration. Check back when a future-dated expiration is available.",
+      };
+    }
+
     const callContract = nearest.calls.find((c) => c.strike === strike);
     const putContract = nearest.puts.find((p) => p.strike === strike);
 
@@ -485,7 +496,8 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
 
     const now = new Date();
     const meaningfulExps = [...options].filter((o) => toYears(o.expirationDate, now) >= 1 / 365);
-    const recent = (meaningfulExps.length > 0 ? meaningfulExps : [...options])
+    if (meaningfulExps.length === 0) return base;
+    const recent = meaningfulExps
       .sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime())
       .slice(0, maxExpirations);
 
