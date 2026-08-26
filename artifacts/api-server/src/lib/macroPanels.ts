@@ -505,7 +505,7 @@ export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedA
     // Pull all chokepoint records. ArcGIS rejects resultRecordCount=1000 / paged
     // offsets on this layer (returns HTTP 400), so fetch a single safe page,
     // ordered newest-first, and group by port in code.
-    const dailyResp = await arcgisQuery(PORTWATCH_DAILY, "1=1", "&resultRecordCount=500&orderByFields=date DESC");
+    const dailyResp = await arcgisQuery(PORTWATCH_DAILY, "1=1", "&resultRecordCount=200&orderByFields=date%20DESC");
     const dailyFeatures = (dailyResp as { features?: Array<{ attributes: Record<string, unknown> }> }).features ?? [];
 
     // Group daily records by port (schema: portname, date, n_total, capacity)

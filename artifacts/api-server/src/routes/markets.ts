@@ -65,7 +65,11 @@ async function serve<T>(
   }
   try {
     const data = await fetcher();
-    cache.set(data);
+    // Don't poison the cache with an explicitly-empty/failed result
+    // (e.g. a transient upstream failure) — let the next request retry.
+    if (!(data && (data as { available?: boolean }).available === false)) {
+      cache.set(data);
+    }
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "Panel fetch failed");
