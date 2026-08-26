@@ -50,10 +50,20 @@ async function fetchChain(ticker: string) {
       calls: OptionContract[];
       puts: OptionContract[];
     }>;
-    // Yahoo sometimes returns a degenerate chain (one expiration, zero OI) for
-    // indices — fall through to CBOE in that case.
+    // Yahoo sometimes returns a degenerate chain: a single expiration that has
+    // already expired (T<0, i.e. "today" with no future-dated contract). That
+    // makes greeks/gex meaningless, so require at least one future-dated
+    // expiration before trusting Yahoo — otherwise fall through to CBOE.
+    const nowMs = Date.now();
+    const MS_DAY = 24 * 3600 * 1000;
+    const hasFutureExp = options.some(
+      (o) =>
+        ((o.expirationDate instanceof Date ? o.expirationDate.getTime() : new Date(o.expirationDate).getTime()) - nowMs) >
+        MS_DAY
+    );
     const hasRealChain =
       options.length > 0 &&
+      hasFutureExp &&
       options.some((o) => (o.calls.some((c) => (c.openInterest ?? 0) > 0) || o.puts.some((p) => (p.openInterest ?? 0) > 0)));
     if (hasRealChain) return { data, spot, options };
     if (!isIndex) logger.warn({ ticker, expirations: options.length }, "Yahoo chain looks degenerate, trying CBOE");
