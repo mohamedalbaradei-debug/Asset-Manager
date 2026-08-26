@@ -13,6 +13,39 @@ import type { IRouter } from "express";
 
 const TICKER_RE = /^[A-Z^.\-=]{1,12}$/;
 
+/**
+ * Live price/name/change for a symbol. Uses `chart` rather than `quote`:
+ * Yahoo's `quote` endpoint is blocked from the hosted environment, while
+ * `chart` (used elsewhere in the app) works, so holdings stay valu-able.
+ */
+async function liveQuote(ticker: string): Promise<{ price: number | null; name: string | null; changePct: number | null }> {
+  try {
+    const r = (await yahooFinance.chart(ticker, { range: "1d", interval: "1d" })) as {
+      meta?: {
+        regularMarketPrice?: number;
+        chartPreviousClose?: number;
+        previousClose?: number;
+        shortName?: string;
+        longName?: string;
+      };
+    };
+    const meta = r?.meta;
+    if (!meta) return { price: null, name: null, changePct: null };
+    const price = typeof meta.regularMarketPrice === "number" ? meta.regularMarketPrice : null;
+    const prev =
+      typeof meta.chartPreviousClose === "number"
+        ? meta.chartPreviousClose
+        : typeof meta.previousClose === "number"
+          ? meta.previousClose
+          : null;
+    const changePct = price != null && prev != null && prev !== 0 ? ((price - prev) / prev) * 100 : null;
+    const name = (meta.shortName ?? meta.longName ?? null) as string | null;
+    return { price, name, changePct };
+  } catch {
+    return { price: null, name: null, changePct: null };
+  }
+}
+
 interface HoldingRow {
   id: string;
   user_id: string;
@@ -40,21 +73,8 @@ function routerWith(): IRouter {
     const symbols = [...new Set(rows.map((h) => h.ticker))];
     const quoteMap = new Map<string, { price: number | null; name: string | null; changePct: number | null }>();
     if (symbols.length > 0) {
-      try {
-        const quotes = await yahooFinance.quote(symbols);
-        for (const q of Array.isArray(quotes) ? quotes : [quotes]) {
-          if (q?.symbol) {
-            quoteMap.set(q.symbol, {
-              price: typeof q.regularMarketPrice === "number" ? q.regularMarketPrice : null,
-              name: q.shortName ?? q.longName ?? null,
-              changePct:
-                typeof q.regularMarketChangePercent === "number" ? q.regularMarketChangePercent : null,
-            });
-          }
-        }
-      } catch {
-        // leave map empty — items render with null prices
-      }
+      const quotes = await Promise.all(symbols.map((s) => liveQuote(s)));
+      symbols.forEach((s, i) => quoteMap.set(s, quotes[i]));
     }
 
     let totalValue = 0;
@@ -190,13 +210,8 @@ function routerWith(): IRouter {
       return;
     }
     try {
-      const quotes = await yahooFinance.quote(ticker);
-      const q = Array.isArray(quotes) ? quotes[0] : quotes;
-      res.json({
-        ticker,
-        name: q?.shortName ?? q?.longName ?? null,
-        price: typeof q?.regularMarketPrice === "number" ? q.regularMarketPrice : null,
-      });
+      const q = await liveQuote(ticker);
+      res.json({ ticker, name: q.name, price: q.price });
     } catch {
       res.status(502).json({ error: "quote_failed" });
     }
