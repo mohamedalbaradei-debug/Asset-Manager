@@ -28,6 +28,7 @@ import {
   DisclaimerSection,
 } from "@/components/report";
 import { CandleChart } from "@/components/CandleChart";
+import { PremiumSectionLock } from "@/components/premium-gate";
 
 const POPULAR_TICKERS = ["AAPL", "TSLA", "NVDA", "MSFT", "AMD"];
 
@@ -386,25 +387,31 @@ export default function HubPage() {
                 </div>
               </div>
 
-              {/* ── Dual Recommendation Cards ── */}
-              {result.traderRec && result.investorRec && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <RecCard
-                    label="Trader Signal"
-                    icon={<TrendingUp className="w-4 h-4" />}
-                    recommendation={result.traderRec.recommendation}
-                    score={result.traderRec.score}
-                    rationale={result.traderRec.rationale}
-                  />
-                  <RecCard
-                    label="Investor Signal"
-                    icon={<LineChartIcon className="w-4 h-4" />}
-                    recommendation={result.investorRec.recommendation}
-                    score={result.investorRec.score}
-                    rationale={result.investorRec.rationale}
-                  />
-                </div>
-              )}
+              {/* ── Dual Recommendation Cards (Premium) ── */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <PremiumSectionLock feature="Trader Signal">
+                  {result.traderRec && (
+                    <RecCard
+                      label="Trader Signal"
+                      icon={<TrendingUp className="w-4 h-4" />}
+                      recommendation={result.traderRec.recommendation}
+                      score={result.traderRec.score}
+                      rationale={result.traderRec.rationale}
+                    />
+                  )}
+                </PremiumSectionLock>
+                <PremiumSectionLock feature="Investor Signal">
+                  {result.investorRec && (
+                    <RecCard
+                      label="Investor Signal"
+                      icon={<LineChartIcon className="w-4 h-4" />}
+                      recommendation={result.investorRec.recommendation}
+                      score={result.investorRec.score}
+                      rationale={result.investorRec.rationale}
+                    />
+                  )}
+                </PremiumSectionLock>
+              </div>
 
               {/* Candlestick chart (1Y OHLC + auto support/resistance) */}
               {result.ohlc1y && result.ohlc1y.length > 0 && (
@@ -674,14 +681,24 @@ export default function HubPage() {
 
               {/* ── Sentiment + Options + Internals ── */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SentimentSection report={result.newsSentiment} />
-                <SentimentSection report={result.socialSentiment} />
+                <PremiumSectionLock feature="Google News Sentiment">
+                  <SentimentSection report={result.newsSentiment} />
+                </PremiumSectionLock>
+                <PremiumSectionLock feature="Reddit Sentiment">
+                  <SentimentSection report={result.socialSentiment} />
+                </PremiumSectionLock>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <OptionsFlowSection flow={result.optionsFlow} />
-                <GreeksSection greeks={result.greeks} />
+                <PremiumSectionLock feature="Options Flow">
+                  <OptionsFlowSection flow={result.optionsFlow} />
+                </PremiumSectionLock>
+                <PremiumSectionLock feature="Options Greeks (ATM)">
+                  <GreeksSection greeks={result.greeks} />
+                </PremiumSectionLock>
               </div>
-              <MarketInternalsSection internals={result.marketInternals} />
+              <PremiumSectionLock feature="Market Internals">
+                <MarketInternalsSection internals={result.marketInternals} />
+              </PremiumSectionLock>
               <MacroContextSection items={result.macroContext} />
 
               {/* News */}

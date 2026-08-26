@@ -27,7 +27,10 @@ export function PremiumGate({ children, feature }: { children: React.ReactNode; 
   );
 }
 
-export function PremiumSectionLock({ feature }: { feature: string }) {
+export function PremiumSectionLock({ feature, children }: { feature: string; children?: React.ReactNode }) {
+  const { user, ready } = useAuth();
+  if (!ready) return <LoadingState />;
+  if (user) return <>{children}</>;
   return (
     <section className="bg-card border border-border rounded-xl p-6 text-center space-y-3">
       <div className="text-2xl">🔒</div>
