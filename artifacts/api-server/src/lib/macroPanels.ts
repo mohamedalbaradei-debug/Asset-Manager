@@ -498,20 +498,13 @@ const SHIPPING_FEATURED: Array<{ name: string; aliases: string[] }> = [
   { name: "Cape of Good Hope", aliases: ["cape of good hope"] },
 ];
 
-// ArcGIS `portname` values for the featured chokepoints (used in the where IN filter).
-const SHIPPING_PORTNAMES = [
-  "Suez Canal",
-  "Panama Canal",
-  "Strait of Hormuz",
-  "Malacca Strait",
-  "Bab el-Mandeb Strait",
-  "Cape of Good Hope",
-];
-
 export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedAt: string; available: boolean }> {
   try {
-    const where = `portname IN (${SHIPPING_PORTNAMES.map((p) => `'${p}'`).join(",")})`;
-    const dailyFeatures = await arcgisQueryPaged(PORTWATCH_DAILY, where, 3);
+    // Pull all chokepoint records. ArcGIS rejects resultRecordCount=1000 / paged
+    // offsets on this layer (returns HTTP 400), so fetch a single safe page,
+    // ordered newest-first, and group by port in code.
+    const dailyResp = await arcgisQuery(PORTWATCH_DAILY, "1=1", "&resultRecordCount=500&orderByFields=date DESC");
+    const dailyFeatures = (dailyResp as { features?: Array<{ attributes: Record<string, unknown> }> }).features ?? [];
 
     // Group daily records by port (schema: portname, date, n_total, capacity)
     const byPort = new Map<string, Array<{ date: string; capacity: number | null; vessels: number | null }>>();
