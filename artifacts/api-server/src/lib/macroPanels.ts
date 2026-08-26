@@ -498,6 +498,8 @@ const SHIPPING_FEATURED: Array<{ name: string; aliases: string[] }> = [
   { name: "Cape of Good Hope", aliases: ["cape of good hope"] },
 ];
 
+let lastGoodShipping: { rows: ShippingRow[]; updatedAt: string; available: boolean } | null = null;
+
 export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedAt: string; available: boolean }> {
   try {
     // Pull all chokepoint records. ArcGIS rejects resultRecordCount=1000 / paged
@@ -589,13 +591,16 @@ export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedA
       });
     }
 
-    return {
+    const result = {
       rows,
       updatedAt: new Date().toISOString(),
       available: rows.some((r) => r.volumeTonnes != null || r.vessels != null),
     };
+    if (result.available) lastGoodShipping = result;
+    return result;
   } catch (err) {
     logger.warn({ err }, "Shipping data unavailable");
+    if (lastGoodShipping) return lastGoodShipping;
     return { rows: [], updatedAt: new Date().toISOString(), available: false };
   }
 }

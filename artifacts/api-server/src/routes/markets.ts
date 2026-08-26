@@ -22,7 +22,7 @@ import { getCryptoOptions } from "../lib/deribit";
 import { getInsiders } from "../lib/insiders";
 import { collectNews, queryArchive, getEventStudy } from "../lib/newsArchive";
 import { getWatchlist } from "../lib/storage";
-import { yahooFinance } from "../lib/yahoo";
+import { chartQuote } from "../lib/prices";
 
 const router: IRouter = Router();
 
@@ -364,8 +364,7 @@ router.get("/vix", async (req: Request, res: Response): Promise<void> => {
     return;
   }
   try {
-    const q = (await yahooFinance.quote("^VIX")) as { regularMarketPrice?: number } | undefined;
-    const vix = q?.regularMarketPrice ?? null;
+    const vix = (await chartQuote("^VIX")).price;
     const out = { vix, ...classifyVix(vix), updatedAt: new Date().toISOString() };
     vixCache.set(out);
     res.json(out);

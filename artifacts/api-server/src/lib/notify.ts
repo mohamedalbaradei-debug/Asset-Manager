@@ -1,6 +1,7 @@
 import { logger } from "./logger";
 import { hasPg, pgQuery } from "./pg";
 import { yahooFinance } from "./yahoo";
+import { chartQuotes } from "./prices";
 
 /**
  * Telegram delivery for price alerts. Reuses a bot token (create free via
@@ -108,15 +109,8 @@ export async function checkPriceAlerts(): Promise<{ checked: number; sent: numbe
   let perfMap = new Map<string, number>();
   try {
     if (priceTickers.length > 0) {
-      const quotes = await yahooFinance.quote(priceTickers);
-      for (const q of Array.isArray(quotes) ? quotes : [quotes]) {
-        if (q?.symbol) {
-          quoteMap.set(q.symbol, {
-            price: typeof q.regularMarketPrice === "number" ? q.regularMarketPrice : null,
-            name: q.shortName ?? q.longName ?? null,
-          });
-        }
-      }
+      const q = await chartQuotes(priceTickers);
+      for (const [sym, v] of q) quoteMap.set(sym, { price: v.price, name: v.name });
     }
     if (rsiTickers.length > 0) rsis = await rsiMap(rsiTickers);
     if (perfTickers.length > 0) {
@@ -206,9 +200,9 @@ async function sendDigests(): Promise<number> {
       const lines: string[] = ["📊 Asset Manager daily digest", ""];
 
       try {
-        const quotes = await yahooFinance.quote(tickers.slice(0, 12));
-        const list = (Array.isArray(quotes) ? quotes : [quotes])
-          .map((q) => ({ s: q?.symbol as string, p: q?.regularMarketPrice as number, c: q?.regularMarketChangePercent as number }))
+        const qmap = await chartQuotes(tickers.slice(0, 12));
+        const list = [...qmap.entries()]
+          .map(([s, v]) => ({ s, p: v.price, c: v.changePct }))
           .sort((x, y) => (y.c ?? 0) - (x.c ?? 0));
         for (const q of list) {
           if (q.p == null) continue;
