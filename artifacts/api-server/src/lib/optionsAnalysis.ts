@@ -612,28 +612,40 @@ export async function getGexData(symbol: string, maxExpirations = 8): Promise<Ge
       gammaFlip = best;
     }
 
-    // Call wall = strike with the largest positive call gamma exposure: dealers
-    // are short those calls, so they must sell into strength → upside
-    // resistance. Put wall = strike with the largest negative put gamma
-    // exposure: dealers are long those puts, so they buy into weakness →
-    // downside support.
+    // Call wall = strike with the largest positive call gamma EXPOSED ABOVE
+    // spot: dealers are short those calls, so they must sell into strength →
+    // upside resistance. Put wall = strike with the largest negative put gamma
+    // BELOW spot: dealers are long those puts, so they buy into weakness →
+    // downside support. Restricting to the out-of-the-money side keeps the two
+    // walls distinct and meaningful (the ATM strike often dominates both
+    // call and put gamma, which would otherwise collapse both walls onto it).
     let callWall: number | null = null;
     let putWall: number | null = null;
     {
       let maxCall = -Infinity;
       let minPut = Infinity;
       for (const p of points) {
-        if (p.callGex > maxCall) {
+        if (p.strike > spot && p.callGex > maxCall) {
           maxCall = p.callGex;
           callWall = p.strike;
         }
-        if (p.putGex < minPut) {
+        if (p.strike < spot && p.putGex < minPut) {
           minPut = p.putGex;
           putWall = p.strike;
         }
       }
-      if (!isFinite(maxCall) || maxCall <= 0) callWall = null;
-      if (!isFinite(minPut) || minPut >= 0) putWall = null;
+      // Fallback: if no gamma on the relevant side of spot, use the overall
+      // extreme so a wall is still reported when the chain is one-sided.
+      if (callWall == null) {
+        let m = -Infinity;
+        for (const p of points) if (p.callGex > m) { m = p.callGex; callWall = p.strike; }
+        if (m <= 0) callWall = null;
+      }
+      if (putWall == null) {
+        let m = Infinity;
+        for (const p of points) if (p.putGex < m) { m = p.putGex; putWall = p.strike; }
+        if (m >= 0) putWall = null;
+      }
     }
 
     let signal: "bullish" | "bearish" | "neutral";

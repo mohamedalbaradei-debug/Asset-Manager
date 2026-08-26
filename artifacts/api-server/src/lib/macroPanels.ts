@@ -451,8 +451,8 @@ export async function getValuationData(): Promise<ValuationData> {
 
 const PORTWATCH_DAILY = "https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer/0/query";
 
-async function arcgisQuery(url: string, where = "1=1", extra = ""): Promise<unknown> {
-  const u = `${url}?where=${encodeURIComponent(where)}&outFields=*&returnGeometry=false&f=json${extra}`;
+async function arcgisQuery(url: string, where = "1=1", extra = "", opts?: { outFields?: string }): Promise<unknown> {
+  const u = `${url}?where=${encodeURIComponent(where)}&outFields=${encodeURIComponent(opts?.outFields ?? "*")}&returnGeometry=false&f=json${extra}`;
   const res = await fetch(u, { signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`ArcGIS query failed: ${res.status}`);
   return res.json();
@@ -500,33 +500,48 @@ const SHIPPING_FEATURED: Array<{ name: string; aliases: string[] }> = [
 
 let lastGoodShipping: { rows: ShippingRow[]; updatedAt: string; available: boolean } | null = null;
 
+function shipDate(d: unknown): string {
+  if (typeof d === "number" && d > 1e12) return new Date(d).toISOString().split("T")[0];
+  const s = String(d ?? "");
+  const m = s.match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : s.slice(0, 10);
+}
+
 export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedAt: string; available: boolean }> {
   try {
-    // Pull all chokepoint records. ArcGIS rejects resultRecordCount=1000 / paged
-    // offsets on this layer (returns HTTP 400), so fetch a single safe page,
-    // ordered newest-first, and group by port in code.
-    const dailyResp = await arcgisQuery(PORTWATCH_DAILY, "1=1", "&resultRecordCount=200&orderByFields=date%20DESC");
-    const dailyFeatures = (dailyResp as { features?: Array<{ attributes: Record<string, unknown> }> }).features ?? [];
-
-    // Group daily records by port (schema: portname, date, n_total, capacity)
+    // One query per featured port. ArcGIS caps resultRecordCount at 1000 and
+    // the layer holds ~28 chokepoints, so a single `1=1` page only covers
+    // ~35 days. Querying each port individually (LIKE on its name) returns the
+    // full ~2.7-year history for that port in one request, giving 1-year+
+    // trend charts. Trimmed outFields keep the payload small/fast.
     const byPort = new Map<string, Array<{ date: string; capacity: number | null; vessels: number | null }>>();
-    for (const f of dailyFeatures) {
-      const a = f.attributes;
-      const name = String(a["portname"] ?? "").trim();
-      if (!name) continue;
-      const capacityRaw = a["capacity"];
-      const vesselsRaw = a["n_total"];
-      const capacity = capacityRaw != null ? parseFloat(String(capacityRaw)) : NaN;
-      const vessels = vesselsRaw != null ? parseFloat(String(vesselsRaw)) : NaN;
-      if (isNaN(capacity) && isNaN(vessels)) continue;
-      const recs = byPort.get(name) ?? [];
-      recs.push({
-        date: String(a["date"] ?? ""),
-        capacity: isNaN(capacity) ? null : capacity,
-        vessels: isNaN(vessels) ? null : vessels,
-      });
-      byPort.set(name, recs);
-    }
+    const FIELDS = "portname,date,capacity,n_total";
+    await Promise.all(
+      SHIPPING_FEATURED.map(async (fp) => {
+        const resp = await arcgisQuery(
+          PORTWATCH_DAILY,
+          `portname LIKE '%${fp.aliases[0]}%'`,
+          "&resultRecordCount=1000&orderByFields=date%20DESC",
+          { outFields: FIELDS },
+        );
+        const feats = (resp as { features?: Array<{ attributes: Record<string, unknown> }> }).features ?? [];
+        for (const f of feats) {
+          const a = f.attributes;
+          const name = String(a["portname"] ?? "").trim();
+          if (!name) continue;
+          const capacity = a["capacity"] != null ? parseFloat(String(a["capacity"])) : NaN;
+          const vessels = a["n_total"] != null ? parseFloat(String(a["n_total"])) : NaN;
+          if (isNaN(capacity) && isNaN(vessels)) continue;
+          const recs = byPort.get(name) ?? [];
+          recs.push({
+            date: shipDate(a["date"]),
+            capacity: isNaN(capacity) ? null : capacity,
+            vessels: isNaN(vessels) ? null : vessels,
+          });
+          byPort.set(name, recs);
+        }
+      })
+    );
 
     const rows: ShippingRow[] = [];
     for (const featured of SHIPPING_FEATURED) {
@@ -554,7 +569,7 @@ export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedA
         vessels = latest.vessels;
         dataDate = latest.date || null;
 
-        series = sorted.map((r) => ({
+        series = sorted.slice(-365).map((r) => ({
           date: r.date,
           volumeTonnes: r.capacity,
           vessels: r.vessels,
