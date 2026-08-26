@@ -20,7 +20,9 @@ const TICKER_RE = /^[A-Z^.\-=]{1,12}$/;
  */
 async function liveQuote(ticker: string): Promise<{ price: number | null; name: string | null; changePct: number | null }> {
   try {
-    const r = (await yahooFinance.chart(ticker, { range: "1d", interval: "1d" })) as {
+    const period2 = Math.floor(Date.now() / 1000);
+    const period1 = period2 - 2 * 86400;
+    const r = (await yahooFinance.chart(ticker, { period1, period2, interval: "1d" })) as {
       meta?: {
         regularMarketPrice?: number;
         chartPreviousClose?: number;
