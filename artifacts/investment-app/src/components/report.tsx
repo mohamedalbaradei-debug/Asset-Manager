@@ -390,7 +390,7 @@ export function AiReportSection({ aiReport }: { aiReport: AnalysisResult["aiRepo
         </div>
       ) : (
         <div className="text-xs font-mono text-muted-foreground leading-relaxed">
-          {aiReport?.note ?? "AI commentary unavailable."} Configure a GROQ_API_KEY to enable the full AI report.
+          {aiReport?.note ?? "AI commentary unavailable."}
         </div>
       )}
 

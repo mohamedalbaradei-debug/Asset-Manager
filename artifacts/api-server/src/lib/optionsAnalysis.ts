@@ -321,13 +321,23 @@ export async function getGreeksSnapshot(ticker: string): Promise<GreeksSnapshot>
     const { spot, options } = await fetchChain(ticker);
     if (options.length === 0 || spot == null) return base;
 
-    // Skip zero/near-zero DTE expirations (e.g. contracts expiring today) —
-    // Black-Scholes collapses to intrinsic-only at T≈0 (call delta 0, put
-    // delta ±1, gamma 0), which is mathematically correct but useless.
-    const now = new Date();
-    const meaningful = options.filter((o) => toYears(o.expirationDate, now) >= 1 / 365);
-    const pool = meaningful.length > 0 ? meaningful : options;
-    const nearest = [...pool].sort(
+    // Skip same/near-session expirations (T≈0): Black-Scholes collapses to
+    // intrinsic-only (call delta 0, gamma 0), which is correct but useless.
+    // Require the nearest expiration to be at least ~12h out so greeks are
+    // meaningful; only bail when literally no future-dated contract exists.
+    const MS_DAY = 24 * 3600 * 1000;
+    const nowMs = Date.now();
+    const futureOpts = options.filter(
+      (o) => o.expirationDate.getTime() - nowMs > MS_DAY * 0.5
+    );
+    if (futureOpts.length === 0) {
+      return {
+        ...base,
+        explanation:
+          "Only contracts expiring within the next 12 hours are quoted right now (T≈0); option greeks aren't meaningful that close to expiration. Check back when a future-dated expiration is listed.",
+      };
+    }
+    const nearest = [...futureOpts].sort(
       (a, b) => a.expirationDate.getTime() - b.expirationDate.getTime()
     )[0];
 
@@ -343,17 +353,6 @@ export async function getGreeksSnapshot(ticker: string): Promise<GreeksSnapshot>
 
     const expiry = nearest.expirationDate;
     const T = toYears(expiry, new Date());
-
-    // If the only available contract expires today (T≈0), Black-Scholes is
-    // degenerate (call delta 0, put delta ±1, gamma 0) — don't surface
-    // misleading zero greeks.
-    if (T < 1 / 365) {
-      return {
-        ...base,
-        explanation:
-          "Only the contract expiring today is listed right now (T≈0); option greeks are not meaningful at expiration. Check back when a future-dated expiration is available.",
-      };
-    }
 
     const callContract = nearest.calls.find((c) => c.strike === strike);
     const putContract = nearest.puts.find((p) => p.strike === strike);

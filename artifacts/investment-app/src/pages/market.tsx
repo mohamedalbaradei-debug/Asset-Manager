@@ -65,7 +65,7 @@ function vixMeaning(v: string): string {
   return "High volatility — markets in panic mode.";
 }
 
-function FearGreedGauge({ data }: { data: FearGreedData }) {
+function FearGreedGauge({ data, updatedAt }: { data: FearGreedData; updatedAt?: string }) {
   const color = fgColor(data.score);
   // Semicircle gauge: score 0 = far left (180°), score 100 = far right (0°), sweeping through top.
   const gaugeAngle = (score: number) => 180 - (score / 100) * 180;
@@ -156,6 +156,12 @@ function FearGreedGauge({ data }: { data: FearGreedData }) {
             </div>
           ))}
         </div>
+
+        {updatedAt && (
+          <div className="text-[10px] font-mono text-muted-foreground/60 text-center pt-1">
+            Updated {new Date(updatedAt).toLocaleString()}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -325,7 +331,7 @@ export default function MarketPage() {
           {/* ── Fear & Greed ── */}
           {macroData.fearGreed && (
             <section>
-              <FearGreedGauge data={macroData.fearGreed} />
+              <FearGreedGauge data={macroData.fearGreed} updatedAt={macroData.updatedAt} />
             </section>
           )}
 
