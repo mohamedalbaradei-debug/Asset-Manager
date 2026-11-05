@@ -507,7 +507,13 @@ const SHIPPING_FEATURED: Array<{ name: string; aliases: string[] }> = [
   { name: "Cape of Good Hope", aliases: ["cape of good hope"] },
 ];
 
-type ShippingSnapshot = { rows: ShippingRow[]; updatedAt: string; available: boolean };
+type ShippingSnapshot = {
+  rows: ShippingRow[];
+  updatedAt: string;
+  available: boolean;
+  /** Every featured chokepoint has charted history (not a partial refresh). */
+  complete?: boolean;
+};
 
 const SHIPPING_CACHE_KEY = "shipping:last-good";
 const SHIPPING_FIELDS = "portname,date,capacity,n_total";
@@ -750,6 +756,8 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
       rows,
       updatedAt: new Date().toISOString(),
       available: rows.some((r) => r.volumeTonnes != null || r.vessels != null),
+      // A partial refresh must stay retryable: consumers skip caching it.
+      complete: rows.every((r) => r.series.length > 0),
     };
     if (isUsableShippingSnapshot(result)) {
       lastGoodShipping = result;

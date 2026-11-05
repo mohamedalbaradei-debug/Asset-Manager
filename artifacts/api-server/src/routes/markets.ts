@@ -67,7 +67,10 @@ async function serve<T>(
     const data = await fetcher();
     // Don't poison the cache with an explicitly-empty/failed result
     // (e.g. a transient upstream failure) — let the next request retry.
-    if (!(data && (data as { available?: boolean }).available === false)) {
+    // Likewise, a partial result (upstream answered for only some ports)
+    // must stay retryable so it can fill in on the next request.
+    const meta = data as { available?: boolean; complete?: boolean };
+    if (!(data && (meta.available === false || meta.complete === false))) {
       cache.set(data);
     }
     res.json(data);
