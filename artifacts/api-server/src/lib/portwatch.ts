@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { hasPg, readMacroCache, writeMacroCache } from "./pg";
 
 /**
  * IMF PortWatch — maritime chokepoint transit counts (keyless ArcGIS).
@@ -45,7 +46,7 @@ async function arcgisQuery(baseUrl: string, opts: { where?: string; orderBy?: st
   if (opts.limit) qs.set("resultRecordCount", String(opts.limit));
   const res = await fetch(`${baseUrl}?${qs.toString()}`, {
     headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`PortWatch ${res.status}`);
   const data = (await res.json()) as ArcGisResponse;
@@ -72,6 +73,12 @@ async function chokepointNames(): Promise<Map<string, string>> {
 
 const dayCache = new Map<string, { t: number; v: ChokepointsData }>();
 
+const CHOKEPOINTS_CACHE_KEY = "shipping:chokepoints";
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let lastGoodChokepoints: ChokepointsData | null = null;
+let hydrated = false;
+
 function toIsoDate(d: unknown): string | null {
   // ArcGIS 'date' field arrives as epoch millis in JSON mode.
   const n = num(d);
@@ -80,45 +87,84 @@ function toIsoDate(d: unknown): string | null {
   return null;
 }
 
+/** Restore the last successful table from Postgres (survives restarts). */
+async function hydrateChokepoints(): Promise<void> {
+  if (hydrated) return;
+  hydrated = true;
+  if (lastGoodChokepoints || !hasPg()) return;
+  try {
+    const saved = await readMacroCache<ChokepointsData>(CHOKEPOINTS_CACHE_KEY);
+    if (!lastGoodChokepoints && Array.isArray(saved?.chokepoints) && saved.chokepoints.length > 0) {
+      lastGoodChokepoints = saved;
+      logger.info({ rows: saved.chokepoints.length }, "Chokepoints table restored from Postgres");
+    }
+  } catch (err) {
+    logger.warn({ err }, "Chokepoints table restore failed");
+  }
+}
+
 export async function getChokepoints(): Promise<ChokepointsData> {
   const hit = dayCache.get("all");
   if (hit && Date.now() - hit.t < 12 * 3600_000) return hit.v;
+  await hydrateChokepoints();
 
-  // Find the most recent observation date.
-  const latest = await arcgisQuery(DAILY_CHOKEPOINTS, { orderBy: "date DESC", limit: 1 });
-  const latestDate = latest.length > 0 ? toIsoDate(latest[0].date) : null;
-  if (!latestDate) throw new Error("PortWatch: no daily chokepoint rows found");
+  try {
+    // ArcGIS intermittently returns empty pages / errors — retry before giving
+    // up, otherwise a single flaky response caches an empty table for 12h.
+    let latest: Record<string, unknown>[] = [];
+    for (let attempt = 0; attempt < 3; attempt++) {
+      latest = await arcgisQuery(DAILY_CHOKEPOINTS, { orderBy: "date DESC", limit: 1 });
+      if (latest.length > 0) break;
+      if (attempt < 2) await sleep(400 * (attempt + 1));
+    }
+    const latestDate = latest.length > 0 ? toIsoDate(latest[0].date) : null;
+    if (!latestDate) throw new Error("PortWatch: no daily chokepoint rows found");
 
-  const [rows, names] = await Promise.all([
-    arcgisQuery(DAILY_CHOKEPOINTS, { where: `date = DATE '${latestDate}'`, limit: 100 }),
-    chokepointNames().catch(() => new Map<string, string>()),
-  ]);
+    let rows: Record<string, unknown>[] = [];
+    for (let attempt = 0; attempt < 3; attempt++) {
+      rows = await arcgisQuery(DAILY_CHOKEPOINTS, { where: `date = DATE '${latestDate}'`, limit: 100 });
+      if (rows.length > 0) break;
+      if (attempt < 2) await sleep(400 * (attempt + 1));
+    }
+    if (rows.length === 0) throw new Error("PortWatch: empty daily chokepoint rows");
 
-  const chokepoints: ChokepointRow[] = rows.map((r) => {
-    const id = typeof r.portid === "string" ? r.portid : typeof r.chokepointid === "string" ? r.chokepointid : "?";
-    const parts = {
-      cargo: num(r.n_cargo),
-      container: num(r.n_container),
-      dryBulk: num(r.n_dry_bulk),
-      generalCargo: num(r.n_general_cargo),
-      roro: num(r.n_roro),
-      tanker: num(r.n_tanker),
+    const names = await chokepointNames().catch(() => new Map<string, string>());
+
+    const chokepoints: ChokepointRow[] = rows.map((r) => {
+      const id = typeof r.portid === "string" ? r.portid : typeof r.chokepointid === "string" ? r.chokepointid : "?";
+      const parts = {
+        cargo: num(r.n_cargo),
+        container: num(r.n_container),
+        dryBulk: num(r.n_dry_bulk),
+        generalCargo: num(r.n_general_cargo),
+        roro: num(r.n_roro),
+        tanker: num(r.n_tanker),
+      };
+      const sum = Object.values(parts).reduce<number>((a, b) => a + (b ?? 0), 0);
+      return {
+        id,
+        name: names.get(id) ?? (typeof r.portname === "string" ? r.portname : id),
+        date: toIsoDate(r.date) ?? latestDate,
+        ...parts,
+        totalTransits: sum > 0 ? sum : num(r.n_transit),
+      };
+    });
+
+    const out: ChokepointsData = {
+      chokepoints: chokepoints.sort((a, b) => a.name.localeCompare(b.name)),
+      date: latestDate,
+      updatedAt: new Date().toISOString(),
     };
-    const sum = Object.values(parts).reduce<number>((a, b) => a + (b ?? 0), 0);
-    return {
-      id,
-      name: names.get(id) ?? (typeof r.portname === "string" ? r.portname : id),
-      date: toIsoDate(r.date) ?? latestDate,
-      ...parts,
-      totalTransits: sum > 0 ? sum : num(r.n_transit),
-    };
-  });
-
-  const out: ChokepointsData = {
-    chokepoints: chokepoints.sort((a, b) => a.name.localeCompare(b.name)),
-    date: latestDate,
-    updatedAt: new Date().toISOString(),
-  };
-  dayCache.set("all", { t: Date.now(), v: out });
-  return out;
+    dayCache.set("all", { t: Date.now(), v: out });
+    lastGoodChokepoints = out;
+    void writeMacroCache(CHOKEPOINTS_CACHE_KEY, out).catch((err) =>
+      logger.warn({ err }, "Chokepoints table persist failed"),
+    );
+    return out;
+  } catch (err) {
+    logger.warn({ err }, "PortWatch chokepoints unavailable");
+    // Serve the last known table rather than an empty panel.
+    if (lastGoodChokepoints) return lastGoodChokepoints;
+    throw err;
+  }
 }
