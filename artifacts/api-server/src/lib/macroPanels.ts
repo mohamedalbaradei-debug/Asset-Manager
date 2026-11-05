@@ -522,7 +522,12 @@ let lastGoodShipping: ShippingSnapshot | null = null;
 let shippingHydrated = false;
 let shippingInflight: Promise<ShippingSnapshot> | null = null;
 let lastShippingFailureAt = 0;
+let lastShippingAttemptAt = 0;
 const SHIPPING_FAILURE_COOLDOWN_MS = 60_000;
+/** Points needed for a "complete" year-long series. */
+const SHIPPING_FULL_SERIES = 300;
+/** While a snapshot is incomplete, retry at most this often. */
+const SHIPPING_PARTIAL_RETRY_MS = 90_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -757,7 +762,9 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
       updatedAt: new Date().toISOString(),
       available: rows.some((r) => r.volumeTonnes != null || r.vessels != null),
       // A partial refresh must stay retryable: consumers skip caching it.
-      complete: rows.every((r) => r.series.length > 0),
+      // Require close to a full year per port so fallback windows (≈35 pts)
+      // keep getting enriched instead of freezing the chart at 1 month.
+      complete: rows.every((r) => r.series.length >= SHIPPING_FULL_SERIES),
     };
     if (isUsableShippingSnapshot(result)) {
       lastGoodShipping = result;
@@ -788,7 +795,14 @@ export async function getShippingData(): Promise<ShippingSnapshot> {
   ) {
     return { rows: [], updatedAt: new Date().toISOString(), available: false };
   }
+  // A partial snapshot (some ports still on the short fallback window) is
+  // served, but retried at most every 90s instead of on every request.
+  const partial = lastGoodShipping && lastGoodShipping.complete === false;
+  if (partial && Date.now() - lastShippingAttemptAt < SHIPPING_PARTIAL_RETRY_MS) {
+    return lastGoodShipping as ShippingSnapshot;
+  }
   if (!shippingInflight) {
+    lastShippingAttemptAt = Date.now();
     shippingInflight = fetchShippingData().finally(() => {
       shippingInflight = null;
     });
