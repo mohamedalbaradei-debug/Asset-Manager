@@ -568,7 +568,9 @@ async function arcgisFeatures(
  * reference, so a single failed request must not sink the whole panel.
  */
 async function fetchPortHistory(alias: string): Promise<Array<{ attributes: Record<string, unknown> }>> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Filtered queries fail much more often than the unfiltered window, so give
+  // each port more chances before settling for the short fallback series.
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       // ~400 daily points ≈ 13 months: enough for a 1-year chart while being
       // ~2.5x lighter than the layer's 1000-record cap.
@@ -577,7 +579,7 @@ async function fetchPortHistory(alias: string): Promise<Array<{ attributes: Reco
     } catch (err) {
       logger.warn({ err, alias, attempt: attempt + 1 }, "PortWatch port query failed");
     }
-    if (attempt < 1) await sleep(400);
+    if (attempt < 2) await sleep(400 * (attempt + 1));
   }
   return [];
 }
@@ -774,10 +776,15 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
     };
     if (isUsableShippingSnapshot(result)) {
       lastGoodShipping = result;
-      // Persist in the background — a slow DB must not delay the response.
-      void writeMacroCache(SHIPPING_CACHE_KEY, result).catch((err) =>
-        logger.warn({ err }, "Shipping snapshot persist failed"),
-      );
+      // Only persist a full-year snapshot: a partial refresh must never
+      // overwrite good history in Postgres (cold starts would then show a
+      // 1-month chart).
+      if (result.complete) {
+        // Persist in the background — a slow DB must not delay the response.
+        void writeMacroCache(SHIPPING_CACHE_KEY, result).catch((err) =>
+          logger.warn({ err }, "Shipping snapshot persist failed"),
+        );
+      }
     } else {
       lastShippingFailureAt = Date.now();
     }
