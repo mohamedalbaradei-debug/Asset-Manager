@@ -78,6 +78,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let lastGoodChokepoints: ChokepointsData | null = null;
 let hydrated = false;
+let chokepointsInflight: Promise<ChokepointsData> | null = null;
 
 function toIsoDate(d: unknown): string | null {
   // ArcGIS 'date' field arrives as epoch millis in JSON mode.
@@ -108,6 +109,30 @@ export async function getChokepoints(): Promise<ChokepointsData> {
   if (hit && Date.now() - hit.t < 12 * 3600_000) return hit.v;
   await hydrateChokepoints();
 
+  // Never block a cold instance on the flaky upstream: return the restored
+  // table after 8s while the refresh keeps running in the background.
+  if (!chokepointsInflight) {
+    chokepointsInflight = fetchChokepoints()
+      .catch((err) => {
+        logger.warn({ err }, "PortWatch chokepoints refresh failed");
+        if (lastGoodChokepoints) return lastGoodChokepoints;
+        throw err;
+      })
+      .finally(() => {
+        chokepointsInflight = null;
+      });
+  }
+  const refresh = chokepointsInflight;
+  if (lastGoodChokepoints) {
+    return Promise.race([
+      refresh,
+      sleep(8000).then(() => lastGoodChokepoints as ChokepointsData),
+    ]);
+  }
+  return refresh;
+}
+
+async function fetchChokepoints(): Promise<ChokepointsData> {
   try {
     // Fetch one recent window in a SINGLE request and pick the most complete
     // day from it. The old two-step "latest date, then date = ..." approach
