@@ -606,6 +606,17 @@ function collectPorts(
   }
 }
 
+/** A snapshot is only usable if it actually contains charted history. */
+function isUsableShippingSnapshot(s: ShippingSnapshot | null | undefined): s is ShippingSnapshot {
+  return (
+    !!s &&
+    s.available === true &&
+    Array.isArray(s.rows) &&
+    s.rows.length > 0 &&
+    s.rows.some((r) => Array.isArray(r.series) && r.series.length > 0)
+  );
+}
+
 /** Restore the last successful snapshot saved in Postgres (survives restarts). */
 async function hydrateShipping(): Promise<void> {
   if (shippingHydrated) return;
@@ -613,9 +624,11 @@ async function hydrateShipping(): Promise<void> {
   if (lastGoodShipping || !hasPg()) return;
   try {
     const saved = await readMacroCache<ShippingSnapshot>(SHIPPING_CACHE_KEY);
-    if (!lastGoodShipping && saved?.available && Array.isArray(saved.rows) && saved.rows.length > 0) {
+    if (!lastGoodShipping && isUsableShippingSnapshot(saved)) {
       lastGoodShipping = saved;
       logger.info({ rows: saved.rows.length }, "Shipping snapshot restored from Postgres");
+    } else if (saved) {
+      logger.warn("Ignoring unusable shipping snapshot in Postgres");
     }
   } catch (err) {
     logger.warn({ err }, "Shipping snapshot restore failed");
@@ -713,8 +726,8 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
       updatedAt: new Date().toISOString(),
       available: rows.some((r) => r.volumeTonnes != null || r.vessels != null),
     };
-    if (result.available) {
-      lastGoodShipping = result;
+    if (result.available) lastGoodShipping = result;
+    if (isUsableShippingSnapshot(result)) {
       // Persist in the background — a slow DB must not delay the response.
       void writeMacroCache(SHIPPING_CACHE_KEY, result).catch((err) =>
         logger.warn({ err }, "Shipping snapshot persist failed"),
