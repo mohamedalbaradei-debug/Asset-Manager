@@ -47,6 +47,24 @@ export async function pgQuery<T extends import("pg").QueryResultRow = import("pg
   return pool.query<T>(text, values as unknown[]);
 }
 
+/** Read a JSON payload from the durable key/value panel cache. */
+export async function readMacroCache<T>(key: string): Promise<T | null> {
+  const res = await pgQuery<{ payload: T }>(
+    `SELECT payload FROM macro_cache WHERE key = $1`,
+    [key],
+  );
+  return res.rows[0]?.payload ?? null;
+}
+
+/** Persist a JSON payload so panels survive Render restarts / cold starts. */
+export async function writeMacroCache(key: string, value: unknown): Promise<void> {
+  await pgQuery(
+    `INSERT INTO macro_cache (key, payload, updated_at) VALUES ($1, $2::jsonb, now())
+     ON CONFLICT (key) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()`,
+    [key, JSON.stringify(value)],
+  );
+}
+
 async function ensureSchema(pool: import("pg").Pool): Promise<void> {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS watchlist (
@@ -125,6 +143,11 @@ async function ensureSchema(pool: import("pg").Pool): Promise<void> {
       PRIMARY KEY (user_id, day)
     );
     CREATE INDEX IF NOT EXISTS portfolio_snapshots_user_idx ON portfolio_snapshots (user_id, day);
+    CREATE TABLE IF NOT EXISTS macro_cache (
+      key TEXT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
   `);
   // Migrations for tables created before these columns existed.
   await pool.query(`

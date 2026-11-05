@@ -1,6 +1,7 @@
 import { fetchFredSeries, latestValue } from "./fredMacro";
 import { yahooFinance } from "./yahoo";
 import { logger } from "./logger";
+import { hasPg, readMacroCache, writeMacroCache } from "./pg";
 
 /**
  * Macro / Fed / FX / valuation / shipping panels.
@@ -451,9 +452,17 @@ export async function getValuationData(): Promise<ValuationData> {
 
 const PORTWATCH_DAILY = "https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer/0/query";
 
-async function arcgisQuery(url: string, where = "1=1", extra = "", opts?: { outFields?: string }): Promise<unknown> {
-  const u = `${url}?where=${encodeURIComponent(where)}&outFields=${encodeURIComponent(opts?.outFields ?? "*")}&returnGeometry=false&f=json${extra}`;
-  const res = await fetch(u, { signal: AbortSignal.timeout(20000) });
+async function arcgisQuery(
+  url: string,
+  where = "1=1",
+  extra = "",
+  opts?: { outFields?: string; timeoutMs?: number },
+): Promise<unknown> {
+  // NOTE: outFields must NOT be percent-encoded — ArcGIS rejects an encoded
+  // comma list ("Invalid query parameters"). Commas are legal in a query
+  // string, so pass them through verbatim.
+  const u = `${url}?where=${encodeURIComponent(where)}&outFields=${opts?.outFields ?? "*"}&returnGeometry=false&f=json${extra}`;
+  const res = await fetch(u, { signal: AbortSignal.timeout(opts?.timeoutMs ?? 20000) });
   if (!res.ok) throw new Error(`ArcGIS query failed: ${res.status}`);
   return res.json();
 }
@@ -498,7 +507,16 @@ const SHIPPING_FEATURED: Array<{ name: string; aliases: string[] }> = [
   { name: "Cape of Good Hope", aliases: ["cape of good hope"] },
 ];
 
-let lastGoodShipping: { rows: ShippingRow[]; updatedAt: string; available: boolean } | null = null;
+type ShippingSnapshot = { rows: ShippingRow[]; updatedAt: string; available: boolean };
+
+const SHIPPING_CACHE_KEY = "shipping:last-good";
+const SHIPPING_FIELDS = "portname,date,capacity,n_total";
+
+let lastGoodShipping: ShippingSnapshot | null = null;
+let shippingHydrated = false;
+let shippingInflight: Promise<ShippingSnapshot> | null = null;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function shipDate(d: unknown): string {
   if (typeof d === "number" && d > 1e12) return new Date(d).toISOString().split("T")[0];
@@ -507,41 +525,123 @@ function shipDate(d: unknown): string {
   return m ? m[0] : s.slice(0, 10);
 }
 
-export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedAt: string; available: boolean }> {
+interface ShipRec {
+  date: string;
+  capacity: number | null;
+  vessels: number | null;
+}
+
+async function arcgisFeatures(
+  where: string,
+  recordCount: number,
+): Promise<Array<{ attributes: Record<string, unknown> }>> {
+  const resp = await arcgisQuery(
+    PORTWATCH_DAILY,
+    where,
+    `&resultRecordCount=${recordCount}&orderByFields=date%20DESC`,
+    { outFields: SHIPPING_FIELDS, timeoutMs: 8000 },
+  );
+  const r = resp as {
+    features?: Array<{ attributes: Record<string, unknown> }>;
+    error?: { message?: string };
+  };
+  if (r.error) throw new Error(`ArcGIS: ${r.error.message ?? "unknown error"}`);
+  return r.features ?? [];
+}
+
+/**
+ * One port's history, retried. ArcGIS intermittently answers with
+ * "Invalid URL" / "Invalid query parameters", hangs, or returns a null
+ * reference, so a single failed request must not sink the whole panel.
+ */
+async function fetchPortHistory(alias: string): Promise<Array<{ attributes: Record<string, unknown> }>> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      // ~400 daily points ≈ 13 months: enough for a 1-year chart while being
+      // ~2.5x lighter than the layer's 1000-record cap.
+      const feats = await arcgisFeatures(`portname LIKE '%${alias}%'`, 400);
+      if (feats.length > 0) return feats;
+    } catch (err) {
+      logger.warn({ err, alias, attempt: attempt + 1 }, "PortWatch port query failed");
+    }
+    if (attempt < 1) await sleep(400);
+  }
+  return [];
+}
+
+/** Latest window covering every port — fallback when per-port history fails. */
+async function fetchRecentAllPorts(): Promise<Array<{ attributes: Record<string, unknown> }>> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const feats = await arcgisFeatures("1=1", 200);
+      if (feats.length > 0) return feats;
+    } catch (err) {
+      logger.warn({ err, attempt: attempt + 1 }, "PortWatch recent query failed");
+    }
+    if (attempt < 1) await sleep(500);
+  }
+  return [];
+}
+
+function collectPorts(
+  byPort: Map<string, ShipRec[]>,
+  feats: Array<{ attributes: Record<string, unknown> }>,
+): void {
+  for (const f of feats) {
+    const a = f.attributes;
+    const name = String(a["portname"] ?? "").trim();
+    if (!name) continue;
+    const capacity = a["capacity"] != null ? parseFloat(String(a["capacity"])) : NaN;
+    const vessels = a["n_total"] != null ? parseFloat(String(a["n_total"])) : NaN;
+    if (isNaN(capacity) && isNaN(vessels)) continue;
+    const recs = byPort.get(name) ?? [];
+    recs.push({
+      date: shipDate(a["date"]),
+      capacity: isNaN(capacity) ? null : capacity,
+      vessels: isNaN(vessels) ? null : vessels,
+    });
+    byPort.set(name, recs);
+  }
+}
+
+/** Restore the last successful snapshot saved in Postgres (survives restarts). */
+async function hydrateShipping(): Promise<void> {
+  if (shippingHydrated) return;
+  shippingHydrated = true;
+  if (lastGoodShipping || !hasPg()) return;
+  try {
+    const saved = await readMacroCache<ShippingSnapshot>(SHIPPING_CACHE_KEY);
+    if (!lastGoodShipping && saved?.available && Array.isArray(saved.rows) && saved.rows.length > 0) {
+      lastGoodShipping = saved;
+      logger.info({ rows: saved.rows.length }, "Shipping snapshot restored from Postgres");
+    }
+  } catch (err) {
+    logger.warn({ err }, "Shipping snapshot restore failed");
+  }
+}
+
+async function fetchShippingData(): Promise<ShippingSnapshot> {
   try {
     // One query per featured port. ArcGIS caps resultRecordCount at 1000 and
     // the layer holds ~28 chokepoints, so a single `1=1` page only covers
     // ~35 days. Querying each port individually (LIKE on its name) returns the
-    // full ~2.7-year history for that port in one request, giving 1-year+
-    // trend charts. Trimmed outFields keep the payload small/fast.
-    const byPort = new Map<string, Array<{ date: string; capacity: number | null; vessels: number | null }>>();
-    const FIELDS = "portname,date,capacity,n_total";
-    await Promise.all(
-      SHIPPING_FEATURED.map(async (fp) => {
-        const resp = await arcgisQuery(
-          PORTWATCH_DAILY,
-          `portname LIKE '%${fp.aliases[0]}%'`,
-          "&resultRecordCount=1000&orderByFields=date%20DESC",
-          { outFields: FIELDS },
-        );
-        const feats = (resp as { features?: Array<{ attributes: Record<string, unknown> }> }).features ?? [];
-        for (const f of feats) {
-          const a = f.attributes;
-          const name = String(a["portname"] ?? "").trim();
-          if (!name) continue;
-          const capacity = a["capacity"] != null ? parseFloat(String(a["capacity"])) : NaN;
-          const vessels = a["n_total"] != null ? parseFloat(String(a["n_total"])) : NaN;
-          if (isNaN(capacity) && isNaN(vessels)) continue;
-          const recs = byPort.get(name) ?? [];
-          recs.push({
-            date: shipDate(a["date"]),
-            capacity: isNaN(capacity) ? null : capacity,
-            vessels: isNaN(vessels) ? null : vessels,
-          });
-          byPort.set(name, recs);
-        }
-      })
+    // full history for that port, giving 1-year+ trend charts.
+    const byPort = new Map<string, ShipRec[]>();
+    const perPort = await Promise.all(
+      SHIPPING_FEATURED.map(async (fp, i) => {
+        // Stagger the burst so ArcGIS doesn't reject every request at once.
+        if (i > 0) await sleep(i * 150);
+        return fetchPortHistory(fp.aliases[0]);
+      }),
     );
+    for (const feats of perPort) collectPorts(byPort, feats);
+
+    // If every per-port query failed, grab the latest window for all ports:
+    // shorter series, but the panel still shows real values instead of empty.
+    if (byPort.size === 0) {
+      logger.warn("Per-port shipping history unavailable — falling back to recent window");
+      collectPorts(byPort, await fetchRecentAllPorts());
+    }
 
     const rows: ShippingRow[] = [];
     for (const featured of SHIPPING_FEATURED) {
@@ -606,16 +706,41 @@ export async function getShippingData(): Promise<{ rows: ShippingRow[]; updatedA
       });
     }
 
-    const result = {
+    const result: ShippingSnapshot = {
       rows,
       updatedAt: new Date().toISOString(),
       available: rows.some((r) => r.volumeTonnes != null || r.vessels != null),
     };
-    if (result.available) lastGoodShipping = result;
+    if (result.available) {
+      lastGoodShipping = result;
+      // Persist in the background — a slow DB must not delay the response.
+      void writeMacroCache(SHIPPING_CACHE_KEY, result).catch((err) =>
+        logger.warn({ err }, "Shipping snapshot persist failed"),
+      );
+    }
     return result;
   } catch (err) {
     logger.warn({ err }, "Shipping data unavailable");
     if (lastGoodShipping) return lastGoodShipping;
     return { rows: [], updatedAt: new Date().toISOString(), available: false };
   }
+}
+
+export async function getShippingData(): Promise<ShippingSnapshot> {
+  await hydrateShipping();
+  if (!shippingInflight) {
+    shippingInflight = fetchShippingData().finally(() => {
+      shippingInflight = null;
+    });
+  }
+  const inflight = shippingInflight;
+  if (lastGoodShipping) {
+    // Never block a cold instance on a slow upstream: serve the persisted
+    // snapshot after 8s while the refresh keeps running in the background.
+    return Promise.race([
+      inflight,
+      sleep(8000).then(() => lastGoodShipping as ShippingSnapshot),
+    ]);
+  }
+  return inflight;
 }
