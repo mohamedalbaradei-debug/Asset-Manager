@@ -515,6 +515,8 @@ const SHIPPING_FIELDS = "portname,date,capacity,n_total";
 let lastGoodShipping: ShippingSnapshot | null = null;
 let shippingHydrated = false;
 let shippingInflight: Promise<ShippingSnapshot> | null = null;
+let lastShippingFailureAt = 0;
+const SHIPPING_FAILURE_COOLDOWN_MS = 60_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -539,7 +541,7 @@ async function arcgisFeatures(
     PORTWATCH_DAILY,
     where,
     `&resultRecordCount=${recordCount}&orderByFields=date%20DESC`,
-    { outFields: SHIPPING_FIELDS, timeoutMs: 8000 },
+    { outFields: SHIPPING_FIELDS, timeoutMs: 6000 },
   );
   const r = resp as {
     features?: Array<{ attributes: Record<string, unknown> }>;
@@ -571,14 +573,14 @@ async function fetchPortHistory(alias: string): Promise<Array<{ attributes: Reco
 
 /** Latest window covering every port — fallback when per-port history fails. */
 async function fetchRecentAllPorts(): Promise<Array<{ attributes: Record<string, unknown> }>> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 1; attempt++) {
     try {
       const feats = await arcgisFeatures("1=1", 200);
       if (feats.length > 0) return feats;
     } catch (err) {
       logger.warn({ err, attempt: attempt + 1 }, "PortWatch recent query failed");
     }
-    if (attempt < 1) await sleep(500);
+    if (attempt < 0) await sleep(500);
   }
   return [];
 }
@@ -717,10 +719,13 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
       void writeMacroCache(SHIPPING_CACHE_KEY, result).catch((err) =>
         logger.warn({ err }, "Shipping snapshot persist failed"),
       );
+    } else {
+      lastShippingFailureAt = Date.now();
     }
     return result;
   } catch (err) {
     logger.warn({ err }, "Shipping data unavailable");
+    lastShippingFailureAt = Date.now();
     if (lastGoodShipping) return lastGoodShipping;
     return { rows: [], updatedAt: new Date().toISOString(), available: false };
   }
@@ -728,6 +733,15 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
 
 export async function getShippingData(): Promise<ShippingSnapshot> {
   await hydrateShipping();
+  // Without any cached snapshot there is nothing to show; don't hammer the
+  // flaky upstream on every request — back off briefly after a total failure.
+  if (
+    !lastGoodShipping &&
+    lastShippingFailureAt > 0 &&
+    Date.now() - lastShippingFailureAt < SHIPPING_FAILURE_COOLDOWN_MS
+  ) {
+    return { rows: [], updatedAt: new Date().toISOString(), available: false };
+  }
   if (!shippingInflight) {
     shippingInflight = fetchShippingData().finally(() => {
       shippingInflight = null;
