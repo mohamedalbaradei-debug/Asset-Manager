@@ -707,7 +707,14 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
         const uniq = new Map<string, ShipRec>();
         for (const r of recs) uniq.set(r.date, r);
         const sorted = [...uniq.values()].sort((x, y) => x.date.localeCompare(y.date));
-        const latest = sorted[sorted.length - 1];
+        // The most recent day is often an in-progress/partial observation
+        // (e.g. Hormuz reporting 0 tonnes with 2 ships). Use the newest day
+        // that has a real flow figure so the headline doesn't show "-100%".
+        const reversed = [...sorted].reverse();
+        const latest =
+          reversed.find((r) => r.capacity != null && r.capacity > 0) ??
+          reversed.find((r) => r.vessels != null && r.vessels > 0) ??
+          sorted[sorted.length - 1];
         volume = latest.capacity;
         vessels = latest.vessels;
         dataDate = latest.date || null;
