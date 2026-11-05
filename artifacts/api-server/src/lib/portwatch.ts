@@ -109,22 +109,40 @@ export async function getChokepoints(): Promise<ChokepointsData> {
   await hydrateChokepoints();
 
   try {
-    // ArcGIS intermittently returns empty pages / errors — retry before giving
-    // up, otherwise a single flaky response caches an empty table for 12h.
-    let latest: Record<string, unknown>[] = [];
-    for (let attempt = 0; attempt < 3; attempt++) {
-      latest = await arcgisQuery(DAILY_CHOKEPOINTS, { orderBy: "date DESC", limit: 1 });
-      if (latest.length > 0) break;
-      if (attempt < 2) await sleep(400 * (attempt + 1));
+    // Fetch one recent window in a SINGLE request and pick the most complete
+    // day from it. The old two-step "latest date, then date = ..." approach
+    // doubled the exposure to ArcGIS' intermittent failures, and a single
+    // flaky response used to cache an empty table for 12h.
+    let raw: Record<string, unknown>[] = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        raw = await arcgisQuery(DAILY_CHOKEPOINTS, { orderBy: "date DESC", limit: 200 });
+      } catch (err) {
+        logger.warn({ err, attempt: attempt + 1 }, "PortWatch daily query failed");
+      }
+      if (raw.length > 0) break;
+      if (attempt < 3) await sleep(400 * (attempt + 1));
     }
-    const latestDate = latest.length > 0 ? toIsoDate(latest[0].date) : null;
-    if (!latestDate) throw new Error("PortWatch: no daily chokepoint rows found");
+    if (raw.length === 0) throw new Error("PortWatch: no daily chokepoint rows found");
 
+    const byDate = new Map<string, Record<string, unknown>[]>();
+    for (const r of raw) {
+      const d = toIsoDate(r.date);
+      if (!d) continue;
+      const arr = byDate.get(d) ?? [];
+      arr.push(r);
+      byDate.set(d, arr);
+    }
+    if (byDate.size === 0) throw new Error("PortWatch: rows had no parsable dates");
+
+    // Most complete day wins; ties go to the more recent date.
+    let latestDate = "";
     let rows: Record<string, unknown>[] = [];
-    for (let attempt = 0; attempt < 3; attempt++) {
-      rows = await arcgisQuery(DAILY_CHOKEPOINTS, { where: `date = DATE '${latestDate}'`, limit: 100 });
-      if (rows.length > 0) break;
-      if (attempt < 2) await sleep(400 * (attempt + 1));
+    for (const [d, arr] of byDate) {
+      if (arr.length > rows.length || (arr.length === rows.length && d > latestDate)) {
+        latestDate = d;
+        rows = arr;
+      }
     }
     if (rows.length === 0) throw new Error("PortWatch: empty daily chokepoint rows");
 
