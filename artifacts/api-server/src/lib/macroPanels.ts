@@ -645,6 +645,12 @@ async function hydrateShipping(): Promise<void> {
   try {
     const saved = await readMacroCache<ShippingSnapshot>(SHIPPING_CACHE_KEY);
     if (!lastGoodShipping && isUsableShippingSnapshot(saved)) {
+      // Recompute completeness instead of trusting the stored flag: an older
+      // snapshot may predate the full-year check and would otherwise be
+      // cached as final with short fallback series.
+      saved.complete = saved.rows.every(
+        (r) => Array.isArray(r.series) && r.series.length >= SHIPPING_FULL_SERIES,
+      );
       lastGoodShipping = saved;
       logger.info({ rows: saved.rows.length }, "Shipping snapshot restored from Postgres");
     } else if (saved) {
