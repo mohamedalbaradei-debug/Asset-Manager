@@ -571,16 +571,17 @@ async function fetchPortHistory(alias: string): Promise<Array<{ attributes: Reco
   return [];
 }
 
-/** Latest window covering every port — fallback when per-port history fails. */
+/** Latest window covering every port — one request, works even in short windows. */
 async function fetchRecentAllPorts(): Promise<Array<{ attributes: Record<string, unknown> }>> {
-  for (let attempt = 0; attempt < 1; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const feats = await arcgisFeatures("1=1", 200);
+      // 1000 records ≈ 35 days across all 28 chokepoints.
+      const feats = await arcgisFeatures("1=1", 1000);
       if (feats.length > 0) return feats;
     } catch (err) {
       logger.warn({ err, attempt: attempt + 1 }, "PortWatch recent query failed");
     }
-    if (attempt < 0) await sleep(500);
+    if (attempt < 1) await sleep(500);
   }
   return [];
 }
@@ -617,6 +618,14 @@ function isUsableShippingSnapshot(s: ShippingSnapshot | null | undefined): s is 
   );
 }
 
+/** Union two series by date (newer values win), capped to the last year. */
+function mergeSeries(prev: ShippingPoint[], next: ShippingPoint[]): ShippingPoint[] {
+  const m = new Map<string, ShippingPoint>();
+  for (const p of prev) m.set(p.date, p);
+  for (const p of next) m.set(p.date, p);
+  return [...m.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-365);
+}
+
 /** Restore the last successful snapshot saved in Postgres (survives restarts). */
 async function hydrateShipping(): Promise<void> {
   if (shippingHydrated) return;
@@ -637,26 +646,23 @@ async function hydrateShipping(): Promise<void> {
 
 async function fetchShippingData(): Promise<ShippingSnapshot> {
   try {
-    // One query per featured port. ArcGIS caps resultRecordCount at 1000 and
-    // the layer holds ~28 chokepoints, so a single `1=1` page only covers
-    // ~35 days. Querying each port individually (LIKE on its name) returns the
-    // full history for that port, giving 1-year+ trend charts.
+    // Run both strategies at once:
+    //  - one `1=1` request covers every port for the last ~35 days, so a short
+    //    upstream window still yields real values for all six chokepoints;
+    //  - per-port requests extend each series to ~1 year when they succeed.
     const byPort = new Map<string, ShipRec[]>();
-    const perPort = await Promise.all(
-      SHIPPING_FEATURED.map(async (fp, i) => {
-        // Stagger the burst so ArcGIS doesn't reject every request at once.
-        if (i > 0) await sleep(i * 150);
-        return fetchPortHistory(fp.aliases[0]);
-      }),
-    );
+    const [recent, perPort] = await Promise.all([
+      fetchRecentAllPorts(),
+      Promise.all(
+        SHIPPING_FEATURED.map(async (fp, i) => {
+          // Stagger the burst so ArcGIS doesn't reject every request at once.
+          if (i > 0) await sleep(i * 150);
+          return fetchPortHistory(fp.aliases[0]);
+        }),
+      ),
+    ]);
+    collectPorts(byPort, recent);
     for (const feats of perPort) collectPorts(byPort, feats);
-
-    // If every per-port query failed, grab the latest window for all ports:
-    // shorter series, but the panel still shows real values instead of empty.
-    if (byPort.size === 0) {
-      logger.warn("Per-port shipping history unavailable — falling back to recent window");
-      collectPorts(byPort, await fetchRecentAllPorts());
-    }
 
     const rows: ShippingRow[] = [];
     for (const featured of SHIPPING_FEATURED) {
@@ -678,7 +684,10 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
       if (recs.length === 0) {
         note = "No transit data available for this chokepoint.";
       } else {
-        const sorted = [...recs].sort((x, y) => x.date.localeCompare(y.date));
+        // Dedupe by date — the recent window and per-port history overlap.
+        const uniq = new Map<string, ShipRec>();
+        for (const r of recs) uniq.set(r.date, r);
+        const sorted = [...uniq.values()].sort((x, y) => x.date.localeCompare(y.date));
         const latest = sorted[sorted.length - 1];
         volume = latest.capacity;
         vessels = latest.vessels;
@@ -721,13 +730,29 @@ async function fetchShippingData(): Promise<ShippingSnapshot> {
       });
     }
 
+    // Preserve longer history from the previous snapshot when this refresh
+    // only managed the short recent window (flaky upstream). A partial fetch
+    // must never shrink a 1-year series back to 35 days.
+    if (lastGoodShipping) {
+      const prevByPort = new Map(lastGoodShipping.rows.map((r) => [r.chokepoint, r]));
+      for (let i = 0; i < rows.length; i++) {
+        const prev = prevByPort.get(rows[i].chokepoint);
+        if (!prev) continue;
+        if (rows[i].series.length === 0) {
+          rows[i] = prev;
+        } else if (prev.series.length > 0) {
+          rows[i] = { ...rows[i], series: mergeSeries(prev.series, rows[i].series) };
+        }
+      }
+    }
+
     const result: ShippingSnapshot = {
       rows,
       updatedAt: new Date().toISOString(),
       available: rows.some((r) => r.volumeTonnes != null || r.vessels != null),
     };
-    if (result.available) lastGoodShipping = result;
     if (isUsableShippingSnapshot(result)) {
+      lastGoodShipping = result;
       // Persist in the background — a slow DB must not delay the response.
       void writeMacroCache(SHIPPING_CACHE_KEY, result).catch((err) =>
         logger.warn({ err }, "Shipping snapshot persist failed"),
